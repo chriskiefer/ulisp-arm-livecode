@@ -5,7 +5,14 @@
 */
 
 // Lisp Library
-const char LispLibrary[] PROGMEM = "";
+const char LispLibrary[] PROGMEM = 
+"(defvar on?)"
+"(setq on? t)"
+"(defvar a 5)"
+"(defvar b 10)"
+"(defun test-sum () (print (+ a b)))"
+"(defun toggle() (if on? (setq on? nil) (setq on? t)))"
+"(defun toggleAndWrite() (toggle) (digitalWrite 19 on?))";
 
 // Compile options
 
@@ -14,7 +21,7 @@ const char LispLibrary[] PROGMEM = "";
 // #define printgcs
 // #define sdcardsupport
 // #define gfxsupport
-// #define lisplibrary
+#define lisplibrary
 #define assemblerlist
 // #define lineeditor
 // #define vt100
@@ -346,7 +353,7 @@ K_INPUT, K_INPUT_PULLUP, K_OUTPUT, K_DEFAULT, K_EXTERNAL,
 K_INPUT, K_INPUT_PULLUP, K_INPUT_PULLDOWN, K_OUTPUT, K_GPIO_IN, K_GPIO_OUT, K_GPIO_OUT_SET,
 K_GPIO_OUT_CLR, K_GPIO_OUT_XOR, K_GPIO_OE, K_GPIO_OE_SET, K_GPIO_OE_CLR, K_GPIO_OE_XOR,
 #endif
-USERFUNCTIONS, ENDFUNCTIONS, SET_SIZE = INT_MAX };
+USERFUNCTIONS, PEEK, POKE, RUNONTHREAD, ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
 
@@ -3269,6 +3276,49 @@ object *tf_help (object *args, object *env) {
 }
 
 // Core functions
+
+object *fn_peek (object *args, object *env) {
+  (void) env;
+  int addr = checkinteger(PEEK, first(args));
+  return number(*(int *)addr);
+}
+
+object *fn_poke (object *args, object *env) {
+  (void) env;
+  int addr = checkinteger(POKE, first(args));
+  object *val = second(args);
+  *(int *)addr = checkinteger(POKE, val);
+  return val;
+}
+
+const char mystring1[] PROGMEM = "peek";
+const char mystring2[] PROGMEM = "poke";
+const char mystring3[] PROGMEM = "runOnThread";
+
+
+object *global_env = NULL;
+object *global_form = NULL;
+
+void global_eval() {
+  eval(global_form, global_env);
+}
+
+object *fn_runOnThread (object *form, object *env) {
+  global_env = env;
+  global_form = form;
+  global_eval();
+  // multicore_reset_core1();
+  // multicore_launch_core1(global_eval);
+  return number(42);
+}
+
+// Insert your own function documentation here
+const char peekdoc[] PROGMEM = "(peek address)\n"
+"Returns the contents of the specified memory address.";
+const char pokedoc[] PROGMEM = "(poke address value)\n"
+"Stores value in the specified memory address, and returns value.";
+const char runOnThreadDoc[] PROGMEM = "(runOnThread)\n"
+"some documentation stuff";
 
 object *fn_not (object *args, object *env) {
   (void) env;
@@ -6311,6 +6361,10 @@ const tbl_entry_t lookup_table[] PROGMEM = {
 
 // Insert your own table entries here
 
+  { mystring1, fn_peek, 0x11, peekdoc },
+  { mystring2, fn_poke, 0x22, pokedoc },
+  { mystring3, fn_runOnThread, 0x11, runOnThreadDoc },
+
 };
 
 // Table lookup functions
@@ -7054,7 +7108,26 @@ void initenv () {
 }
 
 void setup () {
-  Serial.begin(9600);
+  //SETUP FOR PSEQ MODULE
+  //digital signal inputs
+  // pinMode(16, INPUT_PULLUP);  //switch in
+  // pinMode(17, INPUT_PULLUP);  //switch in
+  
+  //digital output 1
+  pinMode(19, OUTPUT); 
+
+  // //digital outputs
+  // pinMode(18, OUTPUT); //dig out
+
+  //PWM outputs
+  analogWriteFreq(30000); //out of hearing range
+  analogWriteResolution(11); // about the best we can get for 30kHz
+  pinMode(20, OUTPUT);
+  analogWrite(20,0);
+  
+  //END OF SETUP FOR PSEQ MODULE
+
+  Serial.begin(115200);
   int start = millis();
   while ((millis() - start) < 5000) { if (Serial) break; }
   initworkspace();
@@ -7065,8 +7138,10 @@ void setup () {
 }
 
 // Read/Evaluate/Print loop
+object *globalEnv;
 
 void repl (object *env) {
+  globalEnv = env;
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
@@ -7081,6 +7156,8 @@ void repl (object *env) {
     object *line = read(gserial);
     if (BreakLevel && line == nil) { pln(pserial); return; }
     if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
+    
+
     push(line, GCStack);
     pfl(pserial);
     line = eval(line, env);
@@ -7091,6 +7168,7 @@ void repl (object *env) {
     pln(pserial);
   }
 }
+
 
 void loop () {
   if (!setjmp(exception)) {
@@ -7116,3 +7194,31 @@ void loop () {
   #endif
   repl(NULL);
 }
+
+// int x;
+// void loop1() {
+
+  // Serial.println(x);
+  // x++;
+  // randomSeed(micros());
+  // gc(NULL, env);
+  // if (BreakLevel) {
+  //   pfstring(PSTR(" : "), pserial);
+  //   pint(BreakLevel, pserial);
+  // }
+  // pserial('>'); pserial(' ');
+  // object *line = read(gserial);
+  // if (BreakLevel && line == nil) { pln(pserial); return; }
+  // if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
+  // line = "(toggleAndWrite)";
+  // push(line, GCStack);
+  // pfl(pserial);
+  // line = eval(line, env);
+  // pfl(pserial);
+  // printobject(line, pserial);
+  // pop(GCStack);
+  // pfl(pserial);
+  // pln(pserial);
+  // eval("test-sum", globalEnv);
+  // delay(1000);
+// }
