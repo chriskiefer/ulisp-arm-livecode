@@ -6,13 +6,17 @@
 
 // Lisp Library
 const char LispLibrary[] PROGMEM = 
-"(defvar on?)"
-"(setq on? t)"
-"(defvar a 5)"
-"(defvar b 10)"
-"(defun test-sum () (print (+ a b)))"
-"(defun toggle() (if on? (setq on? nil) (setq on? t)))"
-"(defun toggleAndWrite() (toggle) (digitalWrite 19 on?))";
+"(defun led-on () (digitalWrite 25 1))"
+"(defun led-off () (digitalWrite 25 0))"
+"(defun blink-for (amt) (progn (led-on) (delay amt) (led-off)))"
+"(defun test-loop-1 () (loop (blink-for 200) (delay 100)))"
+"(defun test-loop-2 () (loop (blink-for 800) (delay 400)))"
+"(defun test-loop-3 () (loop (blink-for 500) (delay 50)))"
+// FIXME the first time it runs okay, but on subsequent calls it seems
+// to only blink once or twice before it crashes...
+// (only happens when passed to runOnThread)
+"(defun finite-test () (dotimes (x 10) (blink-for 300) (delay 50)))"
+  ;
 
 // Compile options
 
@@ -180,6 +184,7 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
   #undef MEMBANK
   #define MEMBANK DMAMEM
 
+// @useq defines and imports
 #elif defined(ARDUINO_RASPBERRY_PI_PICO) || defined(ARDUINO_ADAFRUIT_QTPY_RP2040) || defined(ARDUINO_ADAFRUIT_FEATHER_RP2040)
   #define WORKSPACESIZE (22912-SDSIZE)    /* Objects (8*bytes) */
   #define LITTLEFS
@@ -353,7 +358,7 @@ K_INPUT, K_INPUT_PULLUP, K_OUTPUT, K_DEFAULT, K_EXTERNAL,
 K_INPUT, K_INPUT_PULLUP, K_INPUT_PULLDOWN, K_OUTPUT, K_GPIO_IN, K_GPIO_OUT, K_GPIO_OUT_SET,
 K_GPIO_OUT_CLR, K_GPIO_OUT_XOR, K_GPIO_OE, K_GPIO_OE_SET, K_GPIO_OE_CLR, K_GPIO_OE_XOR,
 #endif
-USERFUNCTIONS, PEEK, POKE, RUNONTHREAD, ENDFUNCTIONS, SET_SIZE = INT_MAX };
+USERFUNCTIONS, RUNONTHREAD, STOPLOOP, ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
 
@@ -2618,9 +2623,24 @@ object *sp_setq (object *args, object *env) {
   return arg;
 }
 
+bool global_loop_break_flag = false;
+bool global_loop_running_flag = false;
+
+// @useq
 object *sp_loop (object *args, object *env) {
+  // Reset flag
+  global_loop_break_flag = false;
+  global_loop_running_flag = true;
+
   object *start = args;
   for (;;) {
+    // Break if flag has been activated
+    if (global_loop_break_flag) {
+      global_loop_break_flag = false;
+      global_loop_running_flag = false;
+      return nil;
+    }
+
     args = start;
     while (args != NULL) {
       object *result = eval(car(args),env);
@@ -3277,48 +3297,36 @@ object *tf_help (object *args, object *env) {
 
 // Core functions
 
-object *fn_peek (object *args, object *env) {
-  (void) env;
-  int addr = checkinteger(PEEK, first(args));
-  return number(*(int *)addr);
-}
 
-object *fn_poke (object *args, object *env) {
-  (void) env;
-  int addr = checkinteger(POKE, first(args));
-  object *val = second(args);
-  *(int *)addr = checkinteger(POKE, val);
-  return val;
-}
-
-const char mystring1[] PROGMEM = "peek";
-const char mystring2[] PROGMEM = "poke";
-const char mystring3[] PROGMEM = "runOnThread";
-
-
+// @useq functions
 object *global_env = NULL;
 object *global_form = NULL;
 
-void global_eval() {
+// TODO perhaps add some FIFO synchronisation if needed?
+void eval_on_core_1() {
   eval(global_form, global_env);
 }
 
 object *fn_runOnThread (object *form, object *env) {
+  pfstring(PSTR("Entering runOnThread...\n"), pserial);
+
+  global_form = car(form);
   global_env = env;
-  global_form = form;
-  global_eval();
-  // multicore_reset_core1();
-  // multicore_launch_core1(global_eval);
+
+  // Reset and start execution on core 1
+  multicore_reset_core1();
+  multicore_launch_core1(eval_on_core_1);
+
+  pfstring(PSTR("\nrunOnThread done, returning...\n"), pserial);
   return number(42);
 }
 
-// Insert your own function documentation here
-const char peekdoc[] PROGMEM = "(peek address)\n"
-"Returns the contents of the specified memory address.";
-const char pokedoc[] PROGMEM = "(poke address value)\n"
-"Stores value in the specified memory address, and returns value.";
-const char runOnThreadDoc[] PROGMEM = "(runOnThread)\n"
-"some documentation stuff";
+object *fn_stopLoop (object *form, object *env) {
+  global_loop_break_flag = true;
+  return nil;
+}
+
+// Livecode-specific functions end here
 
 object *fn_not (object *args, object *env) {
   (void) env;
@@ -5055,6 +5063,9 @@ object *fn_invertdisplay (object *args, object *env) {
 }
 
 // Insert your own function definitions here
+// @useq function names
+const char mystring3[] PROGMEM = "runOnThread";
+const char mystring4[] PROGMEM = "stopLoop";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -5963,6 +5974,9 @@ const char doc223[] PROGMEM = "(invert-display boolean)\n"
 "Mirror-images the display.";
 
 // Insert your own function documentation here
+// @useq documentation
+const char runOnThreadDoc[] PROGMEM = "(runOnThread)\n"
+"some documentation stuff";
 
 // Built-in symbol lookup table
 const tbl_entry_t lookup_table[] PROGMEM = {
@@ -6360,10 +6374,9 @@ const tbl_entry_t lookup_table[] PROGMEM = {
 #endif
 
 // Insert your own table entries here
-
-  { mystring1, fn_peek, 0x11, peekdoc },
-  { mystring2, fn_poke, 0x22, pokedoc },
+// @useq function table entries
   { mystring3, fn_runOnThread, 0x11, runOnThreadDoc },
+  { mystring4, fn_stopLoop, 0x01, runOnThreadDoc },
 
 };
 
@@ -7112,9 +7125,13 @@ void setup () {
   //digital signal inputs
   // pinMode(16, INPUT_PULLUP);  //switch in
   // pinMode(17, INPUT_PULLUP);  //switch in
-  
+
+  // Built-in LED
+  pinMode(25, OUTPUT);
+
   //digital output 1
-  pinMode(19, OUTPUT); 
+  pinMode(19, OUTPUT);
+
 
   // //digital outputs
   // pinMode(18, OUTPUT); //dig out
@@ -7137,12 +7154,18 @@ void setup () {
   pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
 }
 
+/* void setup1() { */
+/*   // */
+/* } */
+
 // Read/Evaluate/Print loop
-object *globalEnv;
+
 
 void repl (object *env) {
-  globalEnv = env;
   for (;;) {
+    /* // TODO is this needed? */
+    /* globalEnv = env; */
+
     randomSeed(micros());
     gc(NULL, env);
     #if defined (printfreespace)
@@ -7166,6 +7189,9 @@ void repl (object *env) {
     pop(GCStack);
     pfl(pserial);
     pln(pserial);
+
+    /* // TODO is this needed? */
+    /* globalEnv = env; */
   }
 }
 
