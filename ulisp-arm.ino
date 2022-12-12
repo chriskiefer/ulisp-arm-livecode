@@ -7154,18 +7154,10 @@ void setup () {
   pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
 }
 
-/* void setup1() { */
-/*   // */
-/* } */
-
 // Read/Evaluate/Print loop
-
 
 void repl (object *env) {
   for (;;) {
-    /* // TODO is this needed? */
-    /* globalEnv = env; */
-
     randomSeed(micros());
     gc(NULL, env);
     #if defined (printfreespace)
@@ -7189,9 +7181,6 @@ void repl (object *env) {
     pop(GCStack);
     pfl(pserial);
     pln(pserial);
-
-    /* // TODO is this needed? */
-    /* globalEnv = env; */
   }
 }
 
@@ -7220,31 +7209,3 @@ void loop () {
   #endif
   repl(NULL);
 }
-
-// int x;
-// void loop1() {
-
-  // Serial.println(x);
-  // x++;
-  // randomSeed(micros());
-  // gc(NULL, env);
-  // if (BreakLevel) {
-  //   pfstring(PSTR(" : "), pserial);
-  //   pint(BreakLevel, pserial);
-  // }
-  // pserial('>'); pserial(' ');
-  // object *line = read(gserial);
-  // if (BreakLevel && line == nil) { pln(pserial); return; }
-  // if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
-  // line = "(toggleAndWrite)";
-  // push(line, GCStack);
-  // pfl(pserial);
-  // line = eval(line, env);
-  // pfl(pserial);
-  // printobject(line, pserial);
-  // pop(GCStack);
-  // pfl(pserial);
-  // pln(pserial);
-  // eval("test-sum", globalEnv);
-  // delay(1000);
-// }
