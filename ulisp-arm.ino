@@ -4,18 +4,88 @@
    Licensed under the MIT license: https://opensource.org/licenses/MIT
 */
 
+// TODO make sure these are the correct numbers
+// especially the digital ins
+#define DIGITAL_OUT_1 19
+#define DIGITAL_OUT_2 20
+#define DIGITAL_OUT_3 21
+#define DIGITAL_OUT_4 22
+
+#define ANALOG_OUT_1 16
+#define ANALOG_OUT_2 17
+
+#define DIGITAL_IN_1 26
+#define DIGITAL_IN_2 27
+
 // Lisp Library
-const char LispLibrary[] PROGMEM = 
-"(defun led-on () (digitalWrite 25 1))"
-"(defun led-off () (digitalWrite 25 0))"
-"(defun blink-for (amt) (progn (led-on) (delay amt) (led-off)))"
-"(defun test-loop-1 () (loop (blink-for 200) (delay 100)))"
-"(defun test-loop-2 () (loop (blink-for 800) (delay 400)))"
-"(defun test-loop-3 () (loop (blink-for 500) (delay 50)))"
-// FIXME the first time it runs okay, but on subsequent calls it seems
-// to only blink once or twice before it crashes...
-// (only happens when passed to runOnThread)
-"(defun finite-test () (dotimes (x 10) (blink-for 300) (delay 50)))"
+const char LispLibrary[] PROGMEM =
+  // Test-related stuff
+  "(defvar DIGITAL_OUT_1 19)"
+  "(defvar DIGITAL_OUT_2 20)"
+  "(defvar DIGITAL_OUT_3 21)"
+  "(defvar DIGITAL_OUT_4 22)"
+  "(defun led-on () (digitalWrite 25 1))"
+  "(defun led-off () (digitalWrite 25 0))"
+  "(defun blink-for (amt) (progn (led-on) (delay amt) (led-off)))"
+  "(defun test-loop-1 () (loop (blink-for 200) (delay 100)))"
+  "(defun test-loop-2 () (loop (blink-for 800) (delay 400)))"
+  "(defun test-loop-3 () (loop (blink-for 500) (delay 50)))"
+  // FIXME not that important but should figure it out at some point
+  // the first time it runs okay, but on subsequent calls it seems
+  // to only blink once or twice before it crashes...
+  // (only happens when passed to runOnThread)
+  "(defun test-finite-loop () (dotimes (x 10) (blink-for 300) (delay 50)))"
+  // Misc Utils
+  //// Timing API
+  // Vars (mostly static)
+  // TODO use meter in calculations, for now assumed 4/4
+  "(defvar meter '(4 4))"
+  "(defvar bpm 120)"
+  "(defvar bps 2)"
+  "(defvar beatDur 500)"
+  "(defvar barDur 2000)"
+  "(defvar last-reset-time 0)" // holds the last time the "transport" was reset
+  // Useful phasors
+  "(defvar time 0)" // holds time since module was switched on
+  "(defvar t 0)" // t = time - reset-time, time since last reset
+  "(defvar beat 0)"
+  "(defvar bar 0)"
+  // Update functions
+  "(defun bpm-to-bps (bpm) (/ bpm (* 1000 60)))"
+  "(defun bpm-to-beatDur (bpm) (/ 1000.0 (bpm-to-bps bpm)))"
+  "(defun bpm-to-beatDur (bpm) (/ (* 1)))"
+  "(defun bpm-to-barDur (bpm) (* (bpm-to-beatDur bpm) (first meter)))"
+  // FIXME are these line breaks causing issues?
+  "(defun set-bpm (new-bpm) (setq bpm new-bpm \
+                                  bps (bpm-to-bps new-bpm) \
+                                  beatDur (bpm-to-beatDur new-bpm) \
+                                  barDur (bpm-to-barDur new-bpm)))"
+  // will be called once at the beginning of every loop
+  "(defun set-time (new-time) (setq time new-time \
+                                    t (- new-time last-reset-time) \
+                                    beat (/ (mod t beatDur) beatDur) \
+                                    bar  (/ (mod t barDur) barDur))"
+  // UI functions
+  "(defun mod1 (x) (mod x 1.0))"
+  "(defun fast (amt phasor) (mod1 (* phasor amt)))" // TODO is a `slow` version possible too?
+  // TODO test that lexical scoping works as expected
+  "(defun sqr (phasor &optional speed-mult) (let ((phasor (if speed-mult (fast speed-mult phasor) phasor))) \
+                                              (if (< phasor 0.5) 1 0)))"
+  "(defun saw (phasor &optional fast-amt) (if (< phasor 0.5) 1 0))"
+  // Outputs
+  "(defvar d1-form '(sqr beat))"
+  "(defvar d2-form '(sqr (fast 2 beat)))"
+  "(defvar d3-form '(sqr (fast 3 beat)))"
+  "(defvar d4-form '(sqr (fast 4 beat)))"
+  "(defun update-d1 () (digitalWrite DIGITAL_OUT_1 (eval d1-form)))" // runs on core 1
+  "(defun update-d2 () (digitalWrite DIGITAL_OUT_2 (eval d2-form)))" // runs on core 1
+  "(defun update-d3 () (digitalWrite DIGITAL_OUT_3 (eval d3-form)))" // runs on core 1
+  "(defun update-d4 () (digitalWrite DIGITAL_OUT_4 (eval d4-form)))" // runs on core 1
+  // TODO some kind of thread synchronisation needed here?
+  "(defun d1 (new-form) (setq d1-form new-form))" // runs on core 0
+  "(defun d2 (new-form) (setq d2-form new-form))" // runs on core 0
+  "(defun d3 (new-form) (setq d3-form new-form))" // runs on core 0
+  "(defun d4 (new-form) (setq d4-form new-form))" // runs on core 0
   ;
 
 // Compile options
@@ -175,7 +245,7 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
   #include <LittleFS.h>
   LittleFS_Program LittleFS;
   #define CODESIZE 256                    /* Bytes */
-  #define STACKDIFF 15000
+  #define STACKDIFF 1u000
   #define CPU_iMXRT1062
   #define SDCARD_SS_PIN BUILTIN_SDCARD
   #define BitOrder uint8_t
@@ -358,7 +428,7 @@ K_INPUT, K_INPUT_PULLUP, K_OUTPUT, K_DEFAULT, K_EXTERNAL,
 K_INPUT, K_INPUT_PULLUP, K_INPUT_PULLDOWN, K_OUTPUT, K_GPIO_IN, K_GPIO_OUT, K_GPIO_OUT_SET,
 K_GPIO_OUT_CLR, K_GPIO_OUT_XOR, K_GPIO_OE, K_GPIO_OE_SET, K_GPIO_OE_CLR, K_GPIO_OE_XOR,
 #endif
-USERFUNCTIONS, RUNONTHREAD, STOPLOOP, ENDFUNCTIONS, SET_SIZE = INT_MAX };
+USERFUNCTIONS, RUNONTHREAD, STOPLOOP, START_CORE_1_LOOP, ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
 
@@ -3303,8 +3373,58 @@ object *global_env = NULL;
 object *global_form = NULL;
 
 // TODO perhaps add some FIFO synchronisation if needed?
-void eval_on_core_1() {
+void eval_global_form() {
   eval(global_form, global_env);
+}
+
+void reset_core_with(void (*entry)(void))
+{
+  multicore_reset_core1();
+  multicore_launch_core1(entry);
+}
+
+object* eval_c_str(char *str, object *env){
+  return eval(fn_readfromstring(lispstring(str), env), env);
+}
+
+typedef unsigned long ulong;
+
+ulong core_1_rate    = 20; // in Hz
+ulong ideal_interval = 1'000'000ul / core_1_rate;
+
+void core_1_loop(){
+  while(1)
+  {
+    ulong start_time = micros();
+
+    eval_c_str((char*)"(set-time (millis))", global_env);
+    eval_c_str((char*)"(print-time)", global_env);
+
+    eval_c_str((char*)"(update-d1)", global_env);
+    eval_c_str((char*)"(update-d2)", global_env);
+    eval_c_str((char*)"(update-d3)", global_env);
+    eval_c_str((char*)"(update-d4)", global_env);
+
+    ulong end_time = micros();
+    ulong execution_time = end_time - start_time;
+    ulong delay_time = ideal_interval - execution_time;
+
+    Serial.printf("Delay time: %d", delay_time);
+    delayMicroseconds(delay_time);
+  }
+}
+
+bool core_1_loop_started = false;
+
+object *fn_start_core_1_loop (object *form, object *env) {
+  pfstring(PSTR("Entering start core1 loop...\n"), pserial);
+
+  reset_core_with(core_1_loop);
+  /* reset_core_with((void(*)(void))eval(global_form, global_env)); */
+
+  pfstring(PSTR("\nCore 1 loop started, returning...\n"), pserial);
+  core_1_loop_started = true;
+  return nil;
 }
 
 object *fn_runOnThread (object *form, object *env) {
@@ -3314,12 +3434,13 @@ object *fn_runOnThread (object *form, object *env) {
   global_env = env;
 
   // Reset and start execution on core 1
-  multicore_reset_core1();
-  multicore_launch_core1(eval_on_core_1);
+  reset_core_with(eval_global_form);
+  /* reset_core_with((void(*)(void))eval(global_form, global_env)); */
 
   pfstring(PSTR("\nrunOnThread done, returning...\n"), pserial);
   return number(42);
 }
+
 
 object *fn_stopLoop (object *form, object *env) {
   global_loop_break_flag = true;
@@ -4531,6 +4652,11 @@ object *fn_millis (object *args, object *env) {
   return number(millis());
 }
 
+object *fn_micros (object *args, object *env) {
+  (void) args, (void) env;
+  return number(micros());
+}
+
 object *fn_sleep (object *args, object *env) {
   (void) env;
   object *arg1 = first(args);
@@ -5066,6 +5192,7 @@ object *fn_invertdisplay (object *args, object *env) {
 // @useq function names
 const char mystring3[] PROGMEM = "runOnThread";
 const char mystring4[] PROGMEM = "stopLoop";
+const char mystring5[] PROGMEM = "start_core_1_loop";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -6375,9 +6502,10 @@ const tbl_entry_t lookup_table[] PROGMEM = {
 
 // Insert your own table entries here
 // @useq function table entries
+// TODO documentation
   { mystring3, fn_runOnThread, 0x11, runOnThreadDoc },
   { mystring4, fn_stopLoop, 0x01, runOnThreadDoc },
-
+  { mystring5, fn_start_core_1_loop, 0x01, runOnThreadDoc },
 };
 
 // Table lookup functions
@@ -7120,33 +7248,57 @@ void initenv () {
   tee = bsymbol(TEE);
 }
 
-void setup () {
-  //SETUP FOR PSEQ MODULE
-  //digital signal inputs
-  // pinMode(16, INPUT_PULLUP);  //switch in
-  // pinMode(17, INPUT_PULLUP);  //switch in
 
-  // Built-in LED
-  pinMode(25, OUTPUT);
+// @useq initialisation
+// A little visual indicator
+void flash_builtin_led() {
+  for(int i=0; i < 20; i++)
+  {
+    digitalWrite(LED_BUILTIN, 1);
+    delay(50);
+    digitalWrite(LED_BUILTIN, 0);
+    delay(50);
+  }
+}
 
-  //digital output 1
-  pinMode(19, OUTPUT);
+void setup_digital_outs() {
+  pinMode(DIGITAL_OUT_1, OUTPUT);
+  pinMode(DIGITAL_OUT_2, OUTPUT);
+  pinMode(DIGITAL_OUT_3, OUTPUT);
+  pinMode(DIGITAL_OUT_4, OUTPUT);
+}
 
-
-  // //digital outputs
-  // pinMode(18, OUTPUT); //dig out
+void setup_analog_outs() {
+  pinMode(ANALOG_OUT_1, OUTPUT);
+  pinMode(ANALOG_OUT_2, OUTPUT);
 
   //PWM outputs
   analogWriteFreq(30000); //out of hearing range
   analogWriteResolution(11); // about the best we can get for 30kHz
-  pinMode(20, OUTPUT);
-  analogWrite(20,0);
-  
-  //END OF SETUP FOR PSEQ MODULE
+}
 
-  Serial.begin(115200);
-  int start = millis();
-  while ((millis() - start) < 5000) { if (Serial) break; }
+// TODO anything else needed?
+void setup_digital_ins() {
+  pinMode(DIGITAL_IN_1, INPUT_PULLUP);
+  pinMode(DIGITAL_IN_2, INPUT_PULLUP);
+}
+
+void setup_builtin_led() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void setup_IO() {
+ setup_digital_outs();
+ setup_analog_outs();
+ setup_digital_ins();
+ setup_builtin_led();
+}
+
+void module_setup() {
+  setup_IO();
+}
+
+void ulisp_setup() {
   initworkspace();
   initenv();
   initsleep();
@@ -7154,9 +7306,22 @@ void setup () {
   pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
 }
 
-// Read/Evaluate/Print loop
+void setup () {
+  /* // Serial setup */
+  /* Serial.begin(115200); */
+  /* int start = millis(); */
+  /* while ((millis() - start) < 5000) { if (Serial) break; } */
+
+  /* module_setup(); */
+  /* ulisp_setup(); */
+
+  // Just a little visual indicator that everything is working
+  flash_builtin_led();
+}
 
 void repl (object *env) {
+  global_env = env;
+
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
@@ -7184,28 +7349,27 @@ void repl (object *env) {
   }
 }
 
-
 void loop () {
-  if (!setjmp(exception)) {
-    #if defined(resetautorun)
-    volatile int autorun = 12; // Fudge to keep code size the same
-    #else
-    volatile int autorun = 13;
-    #endif
-    if (autorun == 12) autorunimage();
-  }
-  // Come here after error
-  delay(100); while (Serial.available()) Serial.read();
-  clrflag(NOESC); BreakLevel = 0;
-  for (int i=0; i<TRACEMAX; i++) TraceDepth[i] = 0;
-  #if defined(sdcardsupport)
-  SDpfile.close(); SDgfile.close();
-  #endif
-  #if defined(lisplibrary)
-  if (!tstflag(LIBRARYLOADED)) { setflag(LIBRARYLOADED); loadfromlibrary(NULL); }
-  #endif
-  #if defined(ULISP_WIFI)
-  client.stop();
-  #endif
-  repl(NULL);
+  /* if (!setjmp(exception)) { */
+  /*   #if defined(resetautorun) */
+  /*   volatile int autorun = 12; // Fudge to keep code size the same */
+  /*   #else */
+  /*   volatile int autorun = 13; */
+  /*   #endif */
+  /*   if (autorun == 12) autorunimage(); */
+  /* } */
+  /* // Come here after error */
+  /* delay(100); while (Serial.available()) Serial.read(); */
+  /* clrflag(NOESC); BreakLevel = 0; */
+  /* for (int i=0; i<TRACEMAX; i++) TraceDepth[i] = 0; */
+  /* #if defined(sdcardsupport) */
+  /* SDpfile.close(); SDgfile.close(); */
+  /* #endif */
+  /* #if defined(lisplibrary) */
+  /* if (!tstflag(LIBRARYLOADED)) { setflag(LIBRARYLOADED); loadfromlibrary(NULL); } */
+  /* #endif */
+  /* #if defined(ULISP_WIFI) */
+  /* client.stop(); */
+  /* #endif */
+  /* repl(NULL); */
 }
