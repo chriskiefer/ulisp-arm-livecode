@@ -3309,16 +3309,17 @@ void reset_core_with(void (*entry)(void))
   multicore_launch_core1(entry);
 }
 
+object* read_c_str(char* str) {
+  return fn_readfromstring(cons(lispstring(str), nil), NULL);
+}
+
 // FIXME says that argument to readfromstring isn't a string
 // but it clearly should be if it's being returned from `lispstring`
 // when printed it prints nil
 // is that a bug?
+// btw not preferable to call in a loop because it allocates memory
 object* eval_c_str(char* expr, object *env){
-  return eval(
-    fn_readfromstring(
-      lispstring(expr)
-      , env)
-    , env);
+  return eval(read_c_str(expr), env);
 }
 
 typedef unsigned long ulong;
@@ -3326,14 +3327,20 @@ typedef unsigned long ulong;
 ulong core_1_rate    = 20; // in Hz
 ulong ideal_interval = 1'000'000ul / core_1_rate;
 
+object *form_update_time PROGMEM = read_c_str((char*)"(update-time)");
+object *form_update_led  PROGMEM = read_c_str((char*)"(update-led)");
+
 void core_1_loop(){
+
   while(1)
   {
     ulong start_time = micros();
 
-    eval_c_str((char*)"(set-time (millis))", global_env);
+    /* eval_c_str((char*)"(set-time (millis))", global_env); */
 
-    eval_c_str((char*)"(update-led)", global_env);
+    eval(form_update_time, global_env);
+    eval(form_update_led,  global_env);
+    /* eval_c_str((char*)"(update-led)", global_env); */
     /* eval_c_str((char*)"(update-d1)", global_env); */
     /* eval_c_str((char*)"(update-d2)", global_env); */
     /* eval_c_str((char*)"(update-d3)", global_env); */
@@ -3398,10 +3405,10 @@ int digital_out_pin(int out) {
 }
 
 object *fn_c_digitalWrite (object *args, object *env) {
-  object *pinArg = car(args);
-  object *valArg = car(cdr(args));
+  object *pinArg = first(args);
+  object *valArg = second(args);
   if (integerp(pinArg) && integerp(valArg)) {
-    int pin = pinArg->integer;
+    int pin = digital_out_pin(pinArg->integer);
     int val = valArg->integer;
     digitalWrite(pin, val);
   } else {
