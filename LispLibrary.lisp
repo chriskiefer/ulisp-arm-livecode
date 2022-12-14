@@ -126,6 +126,12 @@
 (defun in2 (new-form) (setq d4-form new-form))  ;; runs on core 0
 
 ;; TODO
-(defun useq_update ()
-  (set-time (millis))
-  (update-led))
+;; (defun useq-update ()
+;;   (set-time (millis))
+;;   (update-led))
+
+(defun useq-update ()
+  (if (> (mod (millis) 200)
+         100)
+      (c_digitalWrite 99 1)
+      (c_digitalWrite 99 0)))

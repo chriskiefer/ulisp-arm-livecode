@@ -351,7 +351,7 @@ K_GPIO_OUT_CLR, K_GPIO_OUT_XOR, K_GPIO_OE, K_GPIO_OE_SET, K_GPIO_OE_CLR, K_GPIO_
 USERFUNCTIONS,
 RUNONTHREAD,
 STOPLOOP,
-START_CORE_1_LOOP,
+STARTLOOP,
 C_DIGITALWRITE,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
@@ -466,11 +466,18 @@ void initworkspace () {
   }
 }
 
+int myalloc_num_calls = 0;
+
 object *myalloc () {
+  myalloc_num_calls++;
+  Serial.printf("My alloc call no: %d\n", myalloc_num_calls);
+  Serial.printf("Freespace before: %d\n", Freespace);
+
   if (Freespace == 0) error2(NIL, PSTR("no room"));
   object *temp = Freelist;
   Freelist = cdr(Freelist);
   Freespace--;
+  Serial.printf("Freespace after: %d\n", Freespace);
   return temp;
 }
 
@@ -3312,42 +3319,51 @@ typedef unsigned long ulong;
 ulong core_1_rate    = 20; // in Hz
 ulong ideal_interval = 1'000'000ul / core_1_rate;
 
-void core_1_loop(){
-  /* object *sym = lispstring((char*)"useq_update"); */
-  /* sym->type = SYMBOL; */
-  /* object *update_form = cons(sym, nil); */
-  /* push(update_form, GCStack); */
+// INIT MUTEX
+auto_init_mutex(MUTEX);
 
-  /* global_form = update_form; */
+void hotloop(){
+  Serial.printf("hotloop start...\n");
+  /* object *line = read(hotloop_entry); */
+  /* push(line, GCStack); */
+
+  /* Serial.printf("Global_env is: %d\n", global_env); */
+
+  object *update_form = lispstring((char*)"useq-update");
+  update_form->type = SYMBOL;
+  update_form = cons(update_form, nil);
+  /* update_form = cons(update_form, nil); */
+
+  /* push(update_form, GCStack); */
 
   while(1)
   {
-    // @debug
+    mutex_enter_blocking(&MUTEX);
     Serial.printf("Loop start\n");
-    ulong start_time = micros();
 
-    /* eval(update_form, global_env); */
-    eval_global_form();
+    /* ulong start_time = micros(); */
 
-    ulong end_time = micros();
-    ulong execution_time = end_time - start_time;
-    ulong delay_time = ideal_interval - execution_time;
+    object *form = update_form;
 
-    delayMicroseconds(delay_time);
+    push(update_form, GCStack);
+    update_form = eval(update_form, global_env);
+    pop(GCStack);
+
+    /* ulong end_time = micros(); */
+    /* ulong execution_time = end_time - start_time; */
+    /* ulong delay_time = ideal_interval - execution_time; */
+    /* delayMicroseconds(delay_time); */
   }
 }
 
-bool core_1_loop_started = false;
+bool hotloop_started = false;
 
-object *fn_start_core_1_loop (object *args, object *env) {
-  global_form = first(args);
+object *fn_startloop (object *args, object *env) {
+  Serial.printf("startloop start...\n");
   global_env = env;
-
-  Serial.printf("Printing global env:\n");
-  printobject(env, pstr);
-
-  reset_core_with(core_1_loop);
-  core_1_loop_started = true;
+  reset_core_with(hotloop);
+  hotloop_started = true;
+  Serial.printf("startloop end...\n");
   return nil;
 }
 
@@ -5143,7 +5159,7 @@ object *fn_invertdisplay (object *args, object *env) {
 // @useq function names
 const char str_runOnThread[] PROGMEM = "runOnThread";
 const char str_stopLoop[] PROGMEM = "stopLoop";
-const char str_start_core_1_loop[] PROGMEM = "start_core_1_loop";
+const char str_startloop[] PROGMEM = "startloop";
 const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
 
 // Built-in symbol names
@@ -6457,7 +6473,7 @@ const tbl_entry_t lookup_table[] PROGMEM = {
 // TODO documentation
   { str_runOnThread, fn_runOnThread, 0x11, runOnThreadDoc },
   { str_stopLoop, fn_stopLoop, 0x01, runOnThreadDoc },
-  { str_start_core_1_loop, fn_start_core_1_loop, 0x11, runOnThreadDoc },
+  { str_startloop, fn_startloop, 0x00, runOnThreadDoc },
   { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
 };
 
@@ -7023,8 +7039,13 @@ int gserial () {
 #endif
 }
 
+bool entered_hotloop = false;
+
 object *nextitem (gfun_t gfun) {
   // debug
+  if (entered_hotloop)
+    Serial.printf("netxitem start\n");
+
   int ch = gfun();
   while(issp(ch)) ch = gfun();
 
@@ -7152,6 +7173,9 @@ object *nextitem (gfun_t gfun) {
 }
 
 object *readrest (gfun_t gfun) {
+  if (entered_hotloop)
+    Serial.printf("readrest start\n");
+
   object *item = nextitem(gfun);
   object *head = NULL;
   object *tail = NULL;
@@ -7177,6 +7201,9 @@ object *readrest (gfun_t gfun) {
 }
 
 object *read (gfun_t gfun) {
+  if (entered_hotloop)
+    Serial.printf("read start\n");
+
   object *item = nextitem(gfun);
   if (item == (object *)KET) error2(NIL, PSTR("incomplete list"));
   if (item == (object *)BRA) return readrest(gfun);
@@ -7239,6 +7266,7 @@ void led_animation () {
 
 void repl (object *env) {
   global_env = env;
+
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
@@ -7250,10 +7278,12 @@ void repl (object *env) {
       pint(BreakLevel, pserial);
     }
     pserial('>'); pserial(' ');
+
     object *line = read(gserial);
     if (BreakLevel && line == nil) { pln(pserial); return; }
     if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
 
+    mutex_enter_blocking(&MUTEX);
 
     push(line, GCStack);
     pfl(pserial);
@@ -7263,6 +7293,9 @@ void repl (object *env) {
     pop(GCStack);
     pfl(pserial);
     pln(pserial);
+
+
+    mutex_exit(&MUTEX);
   }
 }
 
@@ -7295,13 +7328,11 @@ void setup_analog_outs() {
 
   analogWrite(USEQ_PIN_A1,0);
   analogWrite(USEQ_PIN_A2,0);
-
 }
 
 void setup_digital_ins() {
   pinMode(USEQ_PIN_I1, INPUT_PULLUP);  
   pinMode(USEQ_PIN_I2, INPUT_PULLUP);  
-  
 }
 
 void setup_leds() {
@@ -7318,7 +7349,6 @@ void setup_leds() {
   pinMode(USEQ_PIN_LED_D4, OUTPUT);
 
   digitalWrite(LED_BOARD,1);
-
 }
 
 void setup_IO() {
@@ -7336,14 +7366,12 @@ void ulisp_setup() {
   initenv();
   initsleep();
   initgfx();
-  pfstring(PSTR("uSEQ 0.1"), pserial); pln(pserial);
-  pfstring(PSTR("uLisp 4.3a"), pserial); pln(pserial);
 }
 
 void setup () {
   setup_leds();
   flash_builtin_led(4, 150);
-  led_animation();
+  /* led_animation(); */
 
   // Serial setup
   Serial.begin(115200);
@@ -7352,6 +7380,8 @@ void setup () {
 
   module_setup();
   ulisp_setup();
+
+  pfstring(PSTR("uSEQ 0.1\n"), pserial);
 
   // Just a little visual indicator that everything is working
   flash_builtin_led(10, 50);
@@ -7379,5 +7409,40 @@ void loop () {
   #if defined(ULISP_WIFI)
   client.stop();
   #endif
+
+  Serial.printf("About to enter REPL.\n");
+  Serial.printf("Freespace: %d\n", Freespace);
   repl(NULL);
+}
+
+int c_str_length(char* str) {
+  int i;
+  for (i = 0; str[i] != '\0'; ++i);
+  return i;
+}
+
+char hotloop_entry_str[] PROGMEM = "((useq-update))";
+/* char hotloop_entry_str[] PROGMEM = "((print (millis)))\0"; */
+
+int entry_string_length = -1;
+int hotloop_entry_pointer = 0;
+
+int hotloop_num_calls = 0;
+
+int hotloop_entry() {
+  hotloop_num_calls++;
+  Serial.printf("hotloop num calls: %d\n", hotloop_num_calls);
+  Serial.printf("Freespace: %d\n", Freespace);
+
+  entered_hotloop = true;
+
+  if (entry_string_length < 0)
+    entry_string_length = c_str_length(hotloop_entry_str);
+
+  if (hotloop_entry_pointer >= entry_string_length) {
+    hotloop_entry_pointer = 0;
+    return (int)'\0';
+  } else {
+    return (int)hotloop_entry_str[hotloop_entry_pointer++];
+  }
 }
