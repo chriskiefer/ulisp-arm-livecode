@@ -100,7 +100,7 @@
 
 ;; for testing
 (defvar led-form '(sqr beat))
-(defun update-led () (c_digitalWrite -1 (eval led-form)))  ;; runs on core 1
+(defun update-led () (c_digitalWrite 99 (eval led-form)))  ;; runs on core 1
 (defun led (new-form) (setq led-form new-form))  ;; runs on core 0
 
 ;; Digital outs
@@ -124,3 +124,8 @@
 ;; TODO some kind of thread synchronisation needed here?
 (defun in1 (new-form) INPUT_1_VALUE)
 (defun in2 (new-form) (setq d4-form new-form))  ;; runs on core 0
+
+;; TODO
+(defun useq_update ()
+  (set-time (millis))
+  (update-led))

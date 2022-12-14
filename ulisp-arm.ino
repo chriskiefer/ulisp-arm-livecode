@@ -4,13 +4,6 @@
    Licensed under the MIT license: https://opensource.org/licenses/MIT
 */
 
-// TODO make sure these are the correct numbers
-// especially the digital ins
-
-#include "pins.h"
-#include "LispLibrary.h"
-#include <cmath>
-
 // Compile options
 
 // #define resetautorun
@@ -22,6 +15,10 @@
 #define assemblerlist
 // #define lineeditor
 // #define vt100
+
+// @useq includes
+#include "pins.h"
+#include "LispLibrary.h"
 
 // Includes
 #include <setjmp.h>
@@ -201,6 +198,7 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RS
 #error "Board not supported!"
 #endif
 
+
 // C Macros
 
 #define nil                NULL
@@ -315,7 +313,7 @@ ANALOGWRITERESOLUTION, DELAY, MILLIS, SLEEP, NOTE, REGISTER, EDIT, PPRINT, PPRIN
 LISTLIBRARY, DOCUMENTATION, AVAILABLE, WIFISERVER, WIFISOFTAP, CONNECTED, WIFILOCALIP, WIFICONNECT,
 DRAWPIXEL, DRAWLINE, DRAWRECT, FILLRECT, DRAWCIRCLE, FILLCIRCLE, DRAWROUNDRECT, FILLROUNDRECT,
 DRAWTRIANGLE, FILLTRIANGLE, DRAWCHAR, SETCURSOR, SETTEXTCOLOR, SETTEXTSIZE, SETTEXTWRAP, FILLSCREEN,
-SETROTATION, INVERTDISPLAY, KEYWORDS, 
+SETROTATION, INVERTDISPLAY, KEYWORDS,
 K_LED_BUILTIN, K_HIGH, K_LOW,
 #if defined(CPU_ATSAMD21)
 K_INPUT, K_INPUT_PULLUP, K_INPUT_PULLDOWN, K_OUTPUT, K_AR_DEFAULT, K_AR_INTERNAL1V0, K_AR_INTERNAL1V65,
@@ -3131,7 +3129,7 @@ object *sp_defcode (object *args, object *env) {
       push(pair,env);
     }
     entries = cdr(entries);
-  } 
+  }
 
   // First pass
   int origin = 0;
@@ -3150,7 +3148,7 @@ object *sp_defcode (object *args, object *env) {
     globals = cdr(globals);
   }
   if (codesize > CODESIZE) error(DEFCODE, PSTR("not enough room for code"), var);
-  
+
   // Compact the code block, removing gaps
   origin = 0;
   object *block;
@@ -3167,7 +3165,7 @@ object *sp_defcode (object *args, object *env) {
           if (startblock(codeid) < smallest && startblock(codeid) >= origin) {
             smallest = startblock(codeid);
             block = codeid;
-          }        
+          }
         }
       }
       globals = cdr(globals);
@@ -3291,8 +3289,7 @@ object *tf_help (object *args, object *env) {
   return bsymbol(NOTHING);
 }
 
-// Core functions
-
+/* // Core functions */
 
 // @useq functions
 object *global_env = NULL;
@@ -3309,77 +3306,59 @@ void reset_core_with(void (*entry)(void))
   multicore_launch_core1(entry);
 }
 
-object* read_c_str(char* str) {
-  return fn_readfromstring(cons(lispstring(str), nil), NULL);
-}
-
-// FIXME says that argument to readfromstring isn't a string
-// but it clearly should be if it's being returned from `lispstring`
-// when printed it prints nil
-// is that a bug?
-// btw not preferable to call in a loop because it allocates memory
-object* eval_c_str(char* expr, object *env){
-  return eval(read_c_str(expr), env);
-}
-
 typedef unsigned long ulong;
 
 ulong core_1_rate    = 20; // in Hz
 ulong ideal_interval = 1'000'000ul / core_1_rate;
 
-object *form_update_time PROGMEM = read_c_str((char*)"(update-time)");
-object *form_update_led  PROGMEM = read_c_str((char*)"(update-led)");
-
 void core_1_loop(){
+  /* object *sym = lispstring((char*)"useq_update"); */
+  /* sym->type = SYMBOL; */
+  /* object *update_form = cons(sym, nil); */
+  /* push(update_form, GCStack); */
+
+  /* global_form = update_form; */
 
   while(1)
   {
+    // @debug
+    Serial.printf("Loop start\n");
     ulong start_time = micros();
 
-    /* eval_c_str((char*)"(set-time (millis))", global_env); */
-
-    eval(form_update_time, global_env);
-    eval(form_update_led,  global_env);
-    /* eval_c_str((char*)"(update-led)", global_env); */
-    /* eval_c_str((char*)"(update-d1)", global_env); */
-    /* eval_c_str((char*)"(update-d2)", global_env); */
-    /* eval_c_str((char*)"(update-d3)", global_env); */
-    /* eval_c_str((char*)"(update-d4)", global_env); */
+    /* eval(update_form, global_env); */
+    eval_global_form();
 
     ulong end_time = micros();
     ulong execution_time = end_time - start_time;
     ulong delay_time = ideal_interval - execution_time;
 
-    Serial.printf("Delay time: %d\n", delay_time);
     delayMicroseconds(delay_time);
   }
 }
 
 bool core_1_loop_started = false;
 
-object *fn_start_core_1_loop (object *form, object *env) {
-  /* pfstring(PSTR("Entering start core1 loop...\n"), pserial); */
-
+object *fn_start_core_1_loop (object *args, object *env) {
+  global_form = first(args);
   global_env = env;
-  reset_core_with(core_1_loop);
 
-  /* pfstring(PSTR("\nCore 1 loop started, returning...\n"), pserial); */
+  Serial.printf("Printing global env:\n");
+  printobject(env, pstr);
+
+  reset_core_with(core_1_loop);
   core_1_loop_started = true;
   return nil;
 }
 
-object *fn_runOnThread (object *form, object *env) {
-  pfstring(PSTR("Entering runOnThread...\n"), pserial);
-
-  global_form = car(form);
+object *fn_runOnThread (object *args, object *env) {
+  global_form = first(args);
   global_env = env;
 
-  // Reset and start execution on core 1
-  reset_core_with(eval_global_form);
-  /* reset_core_with((void(*)(void))eval(global_form, global_env)); */
+  Serial.printf("Printing global env:\n");
+  printobject(env, pstr);
 
-  pfstring(PSTR("\nrunOnThread done, returning...\n"), pserial);
-  return number(42);
+  reset_core_with(eval_global_form);
+  return nil;
 }
 
 object *fn_stopLoop (object *form, object *env) {
@@ -3389,7 +3368,7 @@ object *fn_stopLoop (object *form, object *env) {
 
 int digital_out_pin(int out) {
   switch (out)  {
-    case -1:
+    case 99:
       return LED_BUILTIN;
     case 1:
       return DIGITAL_OUT_1;
@@ -6477,8 +6456,8 @@ const tbl_entry_t lookup_table[] PROGMEM = {
 // TODO documentation
   { str_runOnThread, fn_runOnThread, 0x11, runOnThreadDoc },
   { str_stopLoop, fn_stopLoop, 0x01, runOnThreadDoc },
-  { str_start_core_1_loop, fn_start_core_1_loop, 0x01, runOnThreadDoc },
-  { str_c_digitalWrite, fn_c_digitalWrite, 0x21, runOnThreadDoc },
+  { str_start_core_1_loop, fn_start_core_1_loop, 0x11, runOnThreadDoc },
+  { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
 };
 
 // Table lookup functions
@@ -7044,6 +7023,7 @@ int gserial () {
 }
 
 object *nextitem (gfun_t gfun) {
+  // debug
   int ch = gfun();
   while(issp(ch)) ch = gfun();
 
@@ -7222,15 +7202,45 @@ void initenv () {
 }
 
 
-// @useq initialisation
-// A little visual indicator
-void flash_builtin_led() {
-  for(int i=0; i < 20; i++)
+void repl (object *env) {
+  global_env = env;
+
+  for (;;) {
+    randomSeed(micros());
+    gc(NULL, env);
+    #if defined (printfreespace)
+    pint(Freespace, pserial);
+    #endif
+    if (BreakLevel) {
+      pfstring(PSTR(" : "), pserial);
+      pint(BreakLevel, pserial);
+    }
+    pserial('>'); pserial(' ');
+    object *line = read(gserial);
+    if (BreakLevel && line == nil) { pln(pserial); return; }
+    if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
+
+
+    push(line, GCStack);
+    pfl(pserial);
+    line = eval(line, env);
+    pfl(pserial);
+    printobject(line, pserial);
+    pop(GCStack);
+    pfl(pserial);
+    pln(pserial);
+  }
+}
+
+/* // @useq initialisation */
+/* // A little visual indicator */
+void flash_builtin_led(int num, int amt) {
+  for(int i=0; i < num; i++)
   {
     digitalWrite(LED_BUILTIN, 1);
-    delay(50);
+    delay(amt);
     digitalWrite(LED_BUILTIN, 0);
-    delay(50);
+    delay(amt);
   }
 }
 
@@ -7280,6 +7290,9 @@ void ulisp_setup() {
 }
 
 void setup () {
+  setup_builtin_led();
+  flash_builtin_led(4, 150);
+
   // Serial setup
   Serial.begin(115200);
   int start = millis();
@@ -7289,37 +7302,7 @@ void setup () {
   ulisp_setup();
 
   // Just a little visual indicator that everything is working
-  flash_builtin_led();
-}
-
-void repl (object *env) {
-  global_env = env;
-
-  for (;;) {
-    randomSeed(micros());
-    gc(NULL, env);
-    #if defined (printfreespace)
-    pint(Freespace, pserial);
-    #endif
-    if (BreakLevel) {
-      pfstring(PSTR(" : "), pserial);
-      pint(BreakLevel, pserial);
-    }
-    pserial('>'); pserial(' ');
-    object *line = read(gserial);
-    if (BreakLevel && line == nil) { pln(pserial); return; }
-    if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
-    
-
-    push(line, GCStack);
-    pfl(pserial);
-    line = eval(line, env);
-    pfl(pserial);
-    printobject(line, pserial);
-    pop(GCStack);
-    pfl(pserial);
-    pln(pserial);
-  }
+  flash_builtin_led(10, 50);
 }
 
 void loop () {
