@@ -26,6 +26,8 @@
 #include <Wire.h>
 #include <limits.h>
 
+#include "pinmap.h"
+
 #if defined(gfxsupport)
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
@@ -7201,10 +7203,90 @@ void initenv () {
   tee = bsymbol(TEE);
 }
 
+void setup () {
+  //SETUP FOR PSEQ MODULE
+
+  //digital signal inputs
+  pinMode(USEQ_PIN_I1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_I2, INPUT_PULLUP);  
+  
+  //digital outputs
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+
+  //pwm outputs
+  pinMode(USEQ_PIN_A1, OUTPUT); 
+  pinMode(USEQ_PIN_A2, OUTPUT); 
+
+  //LEDs
+
+  pinMode(25,OUTPUT);  //test LED
+  pinMode(USEQ_PIN_LED_I1, OUTPUT);
+  pinMode(USEQ_PIN_LED_I2, OUTPUT);
+  pinMode(USEQ_PIN_LED_A1, OUTPUT);
+  pinMode(USEQ_PIN_LED_A2, OUTPUT);
+
+  pinMode(USEQ_PIN_LED_D1, OUTPUT);
+  pinMode(USEQ_PIN_LED_D2, OUTPUT);
+  pinMode(USEQ_PIN_LED_D3, OUTPUT);
+  pinMode(USEQ_PIN_LED_D4, OUTPUT);
+
+  //PWM outputs
+  analogWriteFreq(30000); //out of hearing range
+  analogWriteResolution(11); // about the best we can get for 30kHz
+  analogWrite(USEQ_PIN_A1,0);
+  analogWrite(USEQ_PIN_A2,0);
+
+  digitalWrite(25,1);
+  int ledDelay=50;
+  for(int i=0; i < 10; i++) {
+    digitalWrite(USEQ_PIN_LED_I1,1);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_A1,1);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_D1,1);
+    digitalWrite(USEQ_PIN_LED_I1,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_D3,1);
+    digitalWrite(USEQ_PIN_LED_A1,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_D4,1);
+    digitalWrite(USEQ_PIN_LED_D1,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_D2,1);
+    digitalWrite(USEQ_PIN_LED_D3,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_A2,1);
+    digitalWrite(USEQ_PIN_LED_D4,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_I2,1);
+    digitalWrite(USEQ_PIN_LED_D2,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_A2,0);
+    delay(ledDelay);
+    digitalWrite(USEQ_PIN_LED_I2,0);
+    delay(ledDelay);  
+    ledDelay -= 4;
+  }  
+  
+  //END OF SETUP FOR PSEQ MODULE
+
+  Serial.begin(115200);
+  int start = millis();
+  while ((millis() - start) < 5000) { if (Serial) break; }
+  initworkspace();
+  initenv();
+  initsleep();
+  initgfx();
+  pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
+}
+
+// Read/Evaluate/Print loop
 
 void repl (object *env) {
-  global_env = env;
-
+  globalEnv = env;
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
