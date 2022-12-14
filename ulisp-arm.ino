@@ -17,7 +17,6 @@
 // #define vt100
 
 // @useq includes
-#include "pins.h"
 #include "LispLibrary.h"
 
 // Includes
@@ -3371,15 +3370,15 @@ object *fn_stopLoop (object *form, object *env) {
 int digital_out_pin(int out) {
   switch (out)  {
     case 99:
-      return LED_BUILTIN;
+      return LED_BOARD;
     case 1:
-      return DIGITAL_OUT_1;
+      return USEQ_PIN_D1;
     case 2:
-      return DIGITAL_OUT_2;
+      return USEQ_PIN_D2;
     case 3:
-      return DIGITAL_OUT_3;
+      return USEQ_PIN_D3;
     case 4:
-      return DIGITAL_OUT_4;
+      return USEQ_PIN_D4;
     default:
       return -1;
   }
@@ -7203,43 +7202,7 @@ void initenv () {
   tee = bsymbol(TEE);
 }
 
-void setup () {
-  //SETUP FOR PSEQ MODULE
-
-  //digital signal inputs
-  pinMode(USEQ_PIN_I1, INPUT_PULLUP);  
-  pinMode(USEQ_PIN_I2, INPUT_PULLUP);  
-  
-  //digital outputs
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-
-  //pwm outputs
-  pinMode(USEQ_PIN_A1, OUTPUT); 
-  pinMode(USEQ_PIN_A2, OUTPUT); 
-
-  //LEDs
-
-  pinMode(25,OUTPUT);  //test LED
-  pinMode(USEQ_PIN_LED_I1, OUTPUT);
-  pinMode(USEQ_PIN_LED_I2, OUTPUT);
-  pinMode(USEQ_PIN_LED_A1, OUTPUT);
-  pinMode(USEQ_PIN_LED_A2, OUTPUT);
-
-  pinMode(USEQ_PIN_LED_D1, OUTPUT);
-  pinMode(USEQ_PIN_LED_D2, OUTPUT);
-  pinMode(USEQ_PIN_LED_D3, OUTPUT);
-  pinMode(USEQ_PIN_LED_D4, OUTPUT);
-
-  //PWM outputs
-  analogWriteFreq(30000); //out of hearing range
-  analogWriteResolution(11); // about the best we can get for 30kHz
-  analogWrite(USEQ_PIN_A1,0);
-  analogWrite(USEQ_PIN_A2,0);
-
-  digitalWrite(25,1);
+void led_animation () {
   int ledDelay=50;
   for(int i=0; i < 10; i++) {
     digitalWrite(USEQ_PIN_LED_I1,1);
@@ -7270,23 +7233,12 @@ void setup () {
     delay(ledDelay);  
     ledDelay -= 4;
   }  
-  
-  //END OF SETUP FOR PSEQ MODULE
-
-  Serial.begin(115200);
-  int start = millis();
-  while ((millis() - start) < 5000) { if (Serial) break; }
-  initworkspace();
-  initenv();
-  initsleep();
-  initgfx();
-  pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
 }
 
 // Read/Evaluate/Print loop
 
 void repl (object *env) {
-  globalEnv = env;
+  global_env = env;
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
@@ -7327,36 +7279,52 @@ void flash_builtin_led(int num, int amt) {
 }
 
 void setup_digital_outs() {
-  pinMode(DIGITAL_OUT_1, OUTPUT);
-  pinMode(DIGITAL_OUT_2, OUTPUT);
-  pinMode(DIGITAL_OUT_3, OUTPUT);
-  pinMode(DIGITAL_OUT_4, OUTPUT);
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D1, OUTPUT); 
 }
 
 void setup_analog_outs() {
-  pinMode(ANALOG_OUT_1, OUTPUT);
-  pinMode(ANALOG_OUT_2, OUTPUT);
+  pinMode(USEQ_PIN_A1, OUTPUT); 
+  pinMode(USEQ_PIN_A2, OUTPUT); 
 
   //PWM outputs
   analogWriteFreq(30000); //out of hearing range
   analogWriteResolution(11); // about the best we can get for 30kHz
+
+  analogWrite(USEQ_PIN_A1,0);
+  analogWrite(USEQ_PIN_A2,0);
+
 }
 
-// TODO anything else needed?
 void setup_digital_ins() {
-  pinMode(DIGITAL_IN_1, INPUT_PULLUP);
-  pinMode(DIGITAL_IN_2, INPUT_PULLUP);
+  pinMode(USEQ_PIN_I1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_I2, INPUT_PULLUP);  
+  
 }
 
-void setup_builtin_led() {
-  pinMode(LED_BUILTIN, OUTPUT);
+void setup_leds() {
+  pinMode(LED_BOARD,OUTPUT);  //test LED
+
+  pinMode(USEQ_PIN_LED_I1, OUTPUT);
+  pinMode(USEQ_PIN_LED_I2, OUTPUT);
+  pinMode(USEQ_PIN_LED_A1, OUTPUT);
+  pinMode(USEQ_PIN_LED_A2, OUTPUT);
+
+  pinMode(USEQ_PIN_LED_D1, OUTPUT);
+  pinMode(USEQ_PIN_LED_D2, OUTPUT);
+  pinMode(USEQ_PIN_LED_D3, OUTPUT);
+  pinMode(USEQ_PIN_LED_D4, OUTPUT);
+
+  digitalWrite(LED_BOARD,1);
+
 }
 
 void setup_IO() {
  setup_digital_outs();
  setup_analog_outs();
  setup_digital_ins();
- setup_builtin_led();
 }
 
 void module_setup() {
@@ -7368,12 +7336,14 @@ void ulisp_setup() {
   initenv();
   initsleep();
   initgfx();
-  pfstring(PSTR("uLisp 4.3a "), pserial); pln(pserial);
+  pfstring(PSTR("uSEQ 0.1"), pserial); pln(pserial);
+  pfstring(PSTR("uLisp 4.3a"), pserial); pln(pserial);
 }
 
 void setup () {
-  setup_builtin_led();
+  setup_leds();
   flash_builtin_led(4, 150);
+  led_animation();
 
   // Serial setup
   Serial.begin(115200);

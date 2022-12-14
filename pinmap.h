@@ -1,3 +1,6 @@
+#ifndef PINMAP_H
+#define PINMAP_H
+
 #define LED_BOARD 25
 
 #define USEQ_PIN_D1 19
@@ -33,4 +36,4 @@
 #define USEQ_PIN_ROTARYENC_A 13
 #define USEQ_PIN_ROTARYENC_B 12
 
-
+#endif
