@@ -7321,10 +7321,22 @@ void setup_leds() {
 
 }
 
+void setup_switches() {
+  pinMode(USEQ_PIN_SWITCH_M1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_SWITCH_M2, INPUT_PULLUP);  
+
+  pinMode(USEQ_PIN_SWITCH_T1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_SWITCH_T2, INPUT_PULLUP);  
+
+  pinMode(USEQ_PIN_SWITCH_R1, INPUT_PULLUP);  
+
+}
+
 void setup_IO() {
  setup_digital_outs();
  setup_analog_outs();
  setup_digital_ins();
+ setup_switches();
 }
 
 void module_setup() {
