@@ -7266,6 +7266,31 @@ void ulisp_print_prompt() {
 
 int bytes_waiting = 0;
 
+
+const symbol_t faux_macros[] =
+// led,         d1,          d2,         d3,         d4,         a1,        a2
+{578449410, 1459912705,  1470152705, 1480392705, 1490632705, 231112705, 241352705};
+
+bool faux_macro_symbol(symbol_t s) {
+  size_t size = sizeof(faux_macros) / sizeof(symbol_t);
+  for (int i = 0; size; i++) {
+    if (s == faux_macros[i])
+      return true;
+  }
+  return false;
+}
+
+object *quote_api_fns(object *form) {
+  if(listp(form) && symbolp(first(form))) {
+    size_t symbol_name = first(form)->name;
+      if (faux_macro_symbol(symbol_name)) {
+        Serial.printf("It's a faux-macro symbol! %d\n", symbol_name);
+        second(form) = quote(second(form));
+      }
+    }
+  return form;
+}
+
 void repl (object *env) {
   for (;;) {
     randomSeed(micros());
@@ -7277,6 +7302,8 @@ void repl (object *env) {
     if (Serial.available() > 0){
       while(Serial.available() > 0) {
         object *line = read(gserial);
+        line = quote_api_fns(line);
+
         if (BreakLevel && line == nil) { pln(pserial); return; }
         if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
 

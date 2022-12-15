@@ -25,14 +25,18 @@
 #define USEQ_PIN_LED_D3 26
 #define USEQ_PIN_LED_D4 22
 
+// Momentary switches
 #define USEQ_PIN_SWITCH_M1 14
 #define USEQ_PIN_SWITCH_M2 15
 
+// Toggles
 #define USEQ_PIN_SWITCH_T1 10
 #define USEQ_PIN_SWITCH_T2 11
 
+// Rotary switch
 #define USEQ_PIN_SWITCH_R1 7
 
+// Rotary encoders
 #define USEQ_PIN_ROTARYENC_A 13
 #define USEQ_PIN_ROTARYENC_B 12
 
