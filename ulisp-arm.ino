@@ -7410,6 +7410,10 @@ void repl (object *env) {
       digitalWrite(USEQ_PIN_LED_I2, useqInputValues[USEQI2]);
       useqInputValues[USEQRS1] = 1 - digitalRead(USEQ_PIN_SWITCH_R1);
 
+      useqInputValues[USEQM1] = 1 - digitalRead(USEQ_PIN_SWITCH_M1);
+      useqInputValues[USEQM2] = 1 - digitalRead(USEQ_PIN_SWITCH_M2);
+      useqInputValues[USEQT1] = 1 - digitalRead(USEQ_PIN_SWITCH_T1);
+      useqInputValues[USEQT2] = 1 - digitalRead(USEQ_PIN_SWITCH_T2);
 
       GlobalStringIndex = 0;
       object *line = read(gcmd);
