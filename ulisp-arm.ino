@@ -7273,7 +7273,7 @@ const symbol_t faux_macros[] =
 
 bool faux_macro_symbol(symbol_t s) {
   size_t size = sizeof(faux_macros) / sizeof(symbol_t);
-  for (int i = 0; size; i++) {
+  for (int i = 0; i < size; i++) {
     if (s == faux_macros[i])
       return true;
   }
