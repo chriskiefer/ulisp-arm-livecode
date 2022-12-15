@@ -130,8 +130,4 @@
   (set-time (millis))
   (update-led))
 
-;; (defun useq-update ()
-;;   (if (> (mod (millis) 200)
-;;          100)
-;;       (c_digitalWrite 99 1)
-;;       (c_digitalWrite 99 0)))
+(defun every (amt dur) (/ (mod t (* amt dur)) (* amt dur)))
