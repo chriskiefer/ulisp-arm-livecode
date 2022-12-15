@@ -6,12 +6,32 @@
 (defun test-loop-2 () (loop (blink-for 800) (delay 400)))
 (defun test-loop-3 () (loop (blink-for 500) (delay 50)))
 
+
+
 ;; FIXME not that important but should figure it out at some point
 ;; the first time it runs okay, but on subsequent calls it seems
 ;; to only blink once or twice before it crashes...
 ;; (only happens when passed to runOnThread)
 (defun test-finite-loop () (dotimes (x 10) (blink-for 300) (delay 50)))
 ;; Misc Utils
+
+
+;;;; INTERNALS
+;; Digital outs
+(defvar d1-form '(sqr (fast 1 beat)))
+(defvar d2-form '(sqr (fast 2 beat)))
+(defvar d3-form '(sqr (fast 3 beat)))
+(defvar d4-form '(sqr (fast 4 beat)))
+(defun update-d1 () (c_digitalWrite 1 (eval d1-form)))  ;; runs on core 1
+(defun update-d2 () (c_digitalWrite 2 (eval d2-form)))  ;; runs on core 1
+(defun update-d3 () (c_digitalWrite 3 (eval d3-form)))  ;; runs on core 1
+(defun update-d4 () (c_digitalWrite 4 (eval d4-form)))  ;; runs on core 1
+;; Analog outs
+(defvar a1-form '(fast 1 bar))
+(defvar a2-form '(fast 1 beat))
+(defun update-a1 () (c_analogWrite 1 (eval a1-form)))  ;; runs on core 1
+(defun update-a2 () (c_analogWrite 2 (eval a2-form)))  ;; runs on core 1
+
 
 ;;;; Timing API
 
@@ -91,7 +111,7 @@
          (scaled-phasor (* num-elements (clamp01 phasor)))
          (idx (floor scaled-phasor)))
     (if (= idx num-elements) (decf idx))
-    (nth idx lst)))
+    (eval (nth idx lst))))
 
 ;; Outputs
 
@@ -101,31 +121,30 @@
 ;; for testing
 (defvar led-form '(sqr beat))
 (defun update-led () (c_digitalWrite 99 (eval led-form)))  ;; runs on core 1
-(defun led (new-form) (setq led-form new-form))  ;; runs on core 0
+(defun led (new) (setq led-form new))  ;; runs on core 0
 
-;; Digital outs
-(defvar d1-form '(sqr beat))
-(defvar d2-form '(sqr (fast 2 beat)))
-(defvar d3-form '(sqr (fast 3 beat)))
-(defvar d4-form '(sqr (fast 4 beat)))
-(defun update-d1 () (c_digitalWrite 1 (eval d1-form)))  ;; runs on core 1
-(defun update-d2 () (c_digitalWrite 2 (eval d2-form)))  ;; runs on core 1
-(defun update-d3 () (c_digitalWrite 3 (eval d3-form)))  ;; runs on core 1
-(defun update-d4 () (c_digitalWrite 4 (eval d4-form)))  ;; runs on core 1
-(defun d1 (new-form) (setq d1-form new-form))  ;; runs on core 0
-(defun d2 (new-form) (setq d2-form new-form))  ;; runs on core 0
-(defun d3 (new-form) (setq d3-form new-form))  ;; runs on core 0
-(defun d4 (new-form) (setq d4-form new-form))  ;; runs on core 0
+(defun d1 (new) (setq d1-form new))  ;; runs on core 0
+(defun d2 (new) (setq d2-form new))  ;; runs on core 0
+(defun d3 (new) (setq d3-form new))  ;; runs on core 0
+(defun d4 (new) (setq d4-form new))  ;; runs on core 0
 
 ;; Analog outs
-(defun update-a1 () (c_analogWrite 1 (eval a1-form)))  ;; runs on core 1
-(defun update-a2 () (c_analogWrite 2 (eval a2-form)))  ;; runs on core 1
+(defun a1 (new) (setq a1-form new))  ;; runs on core 0
+(defun a2 (new) (setq a2-form new))  ;; runs on core 0
 
-;; TODO some kind of thread synchronisation needed here?
-(defun in1 (new-form) INPUT_1_VALUE)
-(defun in2 (new-form) (setq d4-form new-form))  ;; runs on core 0
+(defun in1 () (c_input1))
+(defun in2 () (c_input2))
+
+(defun update-outputs ()
+  (update-d1)
+  (update-d2)
+  (update-d3)
+  (update-d4)
+  (update-a1)
+  (update-a2))
 
 ;; TODO expand
 (defun useq-update ()
   (set-time (millis))
+  (update-outputs)
   (update-led))

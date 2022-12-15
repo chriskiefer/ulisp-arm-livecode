@@ -1,4 +1,4 @@
-/* uLisp ARM Version 4.3a - www.ulisp.com
+/* uLisp ARM Version 4.3a - www.ulisp.comf
    David Johnson-Davies - www.technoblogy.com - 18th September 2022
    
    Licensed under the MIT license: https://opensource.org/licenses/MIT
@@ -353,6 +353,9 @@ RUNONTHREAD,
 STOPLOOP,
 STARTLOOP,
 C_DIGITALWRITE,
+C_ANALOGWRITE,
+C_INPUT1,
+C_INPUT2,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
@@ -3299,6 +3302,10 @@ object *tf_help (object *args, object *env) {
 
 /* // Core functions */
 
+// @useq global variables
+float analog_in_1_latest_value = 0;
+float analog_in_2_latest_value = 0;
+
 // @useq functions
 object *global_env = NULL;
 object *global_form = NULL;
@@ -3386,8 +3393,10 @@ object *fn_stopLoop (object *form, object *env) {
 
 int digital_out_pin(int out) {
   switch (out)  {
+    // Builtin LED
     case 99:
       return LED_BOARD;
+      // Digital Pins
     case 1:
       return USEQ_PIN_D1;
     case 2:
@@ -3401,7 +3410,19 @@ int digital_out_pin(int out) {
   }
 }
 
+int analog_out_pin(int out) {
+  switch (out)  {
+    // Analog Pins
+    case 1:
+      return USEQ_PIN_A1;
+    case 2:
+      return USEQ_PIN_A2;
+    default: return -1;
+  }
+}
+
 object *fn_c_digitalWrite (object *args, object *env) {
+  (void) env;
   object *pinArg = first(args);
   object *valArg = second(args);
   if (integerp(pinArg) && integerp(valArg)) {
@@ -3412,6 +3433,33 @@ object *fn_c_digitalWrite (object *args, object *env) {
    // TODO throw some error
   }
   return nil;
+}
+
+// TODO make this based on the above
+object *fn_c_analogWrite (object *args, object *env) {
+  (void) env;
+  object *pinArg = first(args);
+  object *valArg = second(args);
+  if (integerp(pinArg) && floatp(valArg)) {
+    int pin = analog_out_pin(pinArg->integer);
+    int val = int(valArg->single_float * (float)255);
+    analogWrite(pin, val);
+  } else {
+   // TODO throw some error
+  }
+  return nil;
+}
+
+object *fn_c_input1 (object *args, object *env) {
+  (void) env;
+  (void) args;
+  return makefloat(analog_in_1_latest_value);
+}
+
+object *fn_c_input2 (object *args, object *env) {
+  (void) env;
+  (void) args;
+  return makefloat(analog_in_2_latest_value);
 }
 
 // @useq
@@ -5162,6 +5210,9 @@ const char str_runOnThread[] PROGMEM = "runOnThread";
 const char str_stopLoop[] PROGMEM = "stopLoop";
 const char str_startloop[] PROGMEM = "startloop";
 const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
+const char str_c_analogWrite[] PROGMEM = "c_analogWrite";
+const char str_c_input1[] PROGMEM = "c_input1";
+const char str_c_input2[] PROGMEM = "c_input2";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -6475,7 +6526,10 @@ const tbl_entry_t lookup_table[] PROGMEM = {
   { str_runOnThread, fn_runOnThread, 0x11, runOnThreadDoc },
   { str_stopLoop, fn_stopLoop, 0x01, runOnThreadDoc },
   { str_startloop, fn_startloop, 0x00, runOnThreadDoc },
-  { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
+  { str_c_digitalWrite, fn_c_digitalWrite, 0x02, runOnThreadDoc },
+  { str_c_analogWrite, fn_c_analogWrite, 0x02, runOnThreadDoc },
+  { str_c_input1, fn_c_input1, 0x10, runOnThreadDoc },
+  { str_c_input2, fn_c_input2, 0x10, runOnThreadDoc },
 };
 
 // Table lookup functions
@@ -7264,31 +7318,34 @@ void ulisp_print_prompt() {
   pserial('>'); pserial(' ');
 }
 
-int bytes_waiting = 0;
+/* int bytes_waiting = 0; */
 
 
-const symbol_t faux_macros[] =
-// led,         d1,          d2,         d3,         d4,         a1,        a2
-{578449410, 1459912705,  1470152705, 1480392705, 1490632705, 231112705, 241352705};
+/* const symbol_t faux_macros[] = */
+/* // led,         d1,          d2,         d3,         d4,         a1,        a2 */
+/* {578449410, 1459912705,  1470152705, 1480392705, 1490632705, 231112705, 241352705}; */
 
-bool faux_macro_symbol(symbol_t s) {
-  size_t size = sizeof(faux_macros) / sizeof(symbol_t);
-  for (int i = 0; i < size; i++) {
-    if (s == faux_macros[i])
-      return true;
-  }
-  return false;
-}
+/* bool faux_macro_symbol(symbol_t s) { */
+/*   size_t size = sizeof(faux_macros) / sizeof(symbol_t); */
+/*   for (int i = 0; i < size; i++) { */
+/*     if (s == faux_macros[i]) */
+/*       return true; */
+/*   } */
+/*   return false; */
+/* } */
 
-object *quote_api_fns(object *form) {
-  if(listp(form) && symbolp(first(form))) {
-    size_t symbol_name = first(form)->name;
-      if (faux_macro_symbol(symbol_name)) {
-        Serial.printf("It's a faux-macro symbol! %d\n", symbol_name);
-        second(form) = quote(second(form));
-      }
-    }
-  return form;
+/* object *quote_api_fns(object *form) { */
+/*   if(listp(form) && symbolp(first(form))) { */
+/*     size_t symbol_name = first(form)->name; */
+/*       if (faux_macro_symbol(symbol_name)) { */
+/*         second(form) = quote(second(form)); */
+/*       } */
+/*     } */
+/*   return form; */
+/* } */
+
+void read_analog_ins() {
+ // TODO
 }
 
 void repl (object *env) {
@@ -7302,7 +7359,7 @@ void repl (object *env) {
     if (Serial.available() > 0){
       while(Serial.available() > 0) {
         object *line = read(gserial);
-        line = quote_api_fns(line);
+        /* line = quote_api_fns(line); */
 
         if (BreakLevel && line == nil) { pln(pserial); return; }
         if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
@@ -7318,9 +7375,10 @@ void repl (object *env) {
       }
       ulisp_print_prompt();
     } else {
+      read_analog_ins();
+
       object *update_fn_symbol = lispstring((char*)"useq-update");
       update_fn_symbol->type = SYMBOL;
-
       object *update_form = cons(update_fn_symbol, nil);
       update_form->type = 536884988;
       push(update_form, GCStack);
