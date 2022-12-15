@@ -7,7 +7,7 @@
 // Compile options
 
 // #define resetautorun
-#define printfreespace
+/* #define printfreespace */
 // #define printgcs
 // #define sdcardsupport
 // #define gfxsupport
@@ -470,14 +470,14 @@ int myalloc_num_calls = 0;
 
 object *myalloc () {
   myalloc_num_calls++;
-  Serial.printf("My alloc call no: %d\n", myalloc_num_calls);
-  Serial.printf("Freespace before: %d\n", Freespace);
+  /* Serial.printf("My alloc call no: %d\n", myalloc_num_calls); */
+  /* Serial.printf("Freespace before: %d\n", Freespace); */
 
   if (Freespace == 0) error2(NIL, PSTR("no room"));
   object *temp = Freelist;
   Freelist = cdr(Freelist);
   Freespace--;
-  Serial.printf("Freespace after: %d\n", Freespace);
+  /* Serial.printf("Freespace after: %d\n", Freespace); */
   return temp;
 }
 
@@ -7264,38 +7264,62 @@ void led_animation () {
 
 // Read/Evaluate/Print loop
 
-void repl (object *env) {
-  global_env = env;
+void ulisp_print_prompt() {
+  if (BreakLevel) {
+    pfstring(PSTR(" : "), pserial);
+    pint(BreakLevel, pserial);
+  }
+  pserial('>'); pserial(' ');
+}
 
+int bytes_waiting = 0;
+
+void repl (object *env) {
   for (;;) {
     randomSeed(micros());
     gc(NULL, env);
     #if defined (printfreespace)
     pint(Freespace, pserial);
     #endif
-    if (BreakLevel) {
-      pfstring(PSTR(" : "), pserial);
-      pint(BreakLevel, pserial);
+
+    if (Serial.available() > 0){
+      Serial.printf("Bytes waiting: %d\n", Serial.available());
+      while(Serial.available() > 0) {
+        object *line = read(gserial);
+        if (BreakLevel && line == nil) { pln(pserial); return; }
+        if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
+
+        push(line, GCStack);
+        pfl(pserial);
+        line = eval(line, env);
+        pfl(pserial);
+        printobject(line, pserial);
+        pop(GCStack);
+        pfl(pserial);
+        pln(pserial);
+
+        /* gc(NULL, env); */
+
+      }
+      ulisp_print_prompt();
+    } else {
+      object *useq_update = read(update_reader);
+      if (BreakLevel && useq_update == nil) { pln(pserial); return; }
+      if (useq_update == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
+      /* object *useq_update = lispstring((char*)"useq-update"); */
+      /* useq_update->type = SYMBOL; */
+      /* useq_update = cons(useq_update, nil); */
+      /* useq_update = cons(useq_update, nil); */
+
+      push(useq_update, GCStack);
+      pfl(pserial);
+      useq_update = eval(useq_update, env);
+      pfl(pserial);
+      printobject(useq_update, pserial);
+      pop(GCStack);
+      pfl(pserial);
+      pln(pserial);
     }
-    pserial('>'); pserial(' ');
-
-    object *line = read(gserial);
-    if (BreakLevel && line == nil) { pln(pserial); return; }
-    if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
-
-    mutex_enter_blocking(&MUTEX);
-
-    push(line, GCStack);
-    pfl(pserial);
-    line = eval(line, env);
-    pfl(pserial);
-    printobject(line, pserial);
-    pop(GCStack);
-    pfl(pserial);
-    pln(pserial);
-
-
-    mutex_exit(&MUTEX);
   }
 }
 
@@ -7411,7 +7435,7 @@ void loop () {
   #endif
 
   Serial.printf("About to enter REPL.\n");
-  Serial.printf("Freespace: %d\n", Freespace);
+  ulisp_print_prompt();
   repl(NULL);
 }
 
@@ -7421,28 +7445,20 @@ int c_str_length(char* str) {
   return i;
 }
 
-char hotloop_entry_str[] PROGMEM = "((useq-update))";
-/* char hotloop_entry_str[] PROGMEM = "((print (millis)))\0"; */
+char update_reader_str[] PROGMEM = "((useq-update))";
 
 int entry_string_length = -1;
-int hotloop_entry_pointer = 0;
+int update_reader_pointer = 0;
 
-int hotloop_num_calls = 0;
-
-int hotloop_entry() {
-  hotloop_num_calls++;
-  Serial.printf("hotloop num calls: %d\n", hotloop_num_calls);
-  Serial.printf("Freespace: %d\n", Freespace);
-
-  entered_hotloop = true;
-
+// Tries to fake the user sending "(useq-update)" to the serial
+int update_reader() {
   if (entry_string_length < 0)
-    entry_string_length = c_str_length(hotloop_entry_str);
+    entry_string_length = c_str_length(update_reader_str);
 
-  if (hotloop_entry_pointer >= entry_string_length) {
-    hotloop_entry_pointer = 0;
+  if (update_reader_pointer >= entry_string_length) {
+    update_reader_pointer = 0;
     return (int)'\0';
   } else {
-    return (int)hotloop_entry_str[hotloop_entry_pointer++];
+    return (int)update_reader_str[update_reader_pointer++];
   }
 }
