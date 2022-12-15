@@ -353,6 +353,7 @@ RUNONTHREAD,
 STOPLOOP,
 STARTLOOP,
 C_DIGITALWRITE,
+C_AANALOGWRITE,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
@@ -3401,16 +3402,73 @@ int digital_out_pin(int out) {
   }
 }
 
+int digital_out_LED_pin(int out) {
+  switch (out)  {
+    // Builtin LED
+    case 1:
+      return USEQ_PIN_LED_D1;
+    case 2:
+      return USEQ_PIN_LED_D2;
+    case 3:
+      return USEQ_PIN_LED_D3;
+    case 4:
+      return USEQ_PIN_LED_D4;
+    default:
+      return -1;
+  }
+}
+
+int analog_out_pin(int out) {
+  switch (out)  {
+    // Analog Pins
+    case 1:
+      return USEQ_PIN_A1;
+    case 2:
+      return USEQ_PIN_A2;
+    default: return -1;
+  }
+}
+
+int analog_out_LED_pin(int out) {
+  switch (out)  {
+    // Analog Pins
+    case 1:
+      return USEQ_PIN_LED_A1;
+    case 2:
+      return USEQ_PIN_LED_A2;
+    default: return -1;
+  }
+}
+
 object *fn_c_digitalWrite (object *args, object *env) {
   object *pinArg = first(args);
   object *valArg = second(args);
   if (integerp(pinArg) && integerp(valArg)) {
     int pin = digital_out_pin(pinArg->integer);
+    int led_pin = digital_out_LED_pin(pinArg->integer);
     int val = valArg->integer;
     digitalWrite(pin, val);
+    digitalWrite(led_pin, val);
   } else {
    // TODO throw some error
   }
+  return nil;
+}
+
+object *fn_c_aanalogWrite (object *args, object *env) {
+  (void) env;
+  object *pinArg = first(args);
+  object *valArg = second(args);
+  if (integerp(pinArg) && floatp(valArg)) {
+    int pin = analog_out_pin(pinArg->integer);
+    int led_pin = analog_out_LED_pin(pinArg->integer);
+    int val = floor(valArg->single_float * (float)255);
+    analogWrite(pin, val);
+    digitalWrite(led_pin, val > 127 ? 1 : 0);
+  } else {
+   // TODO throw some error
+  }
+
   return nil;
 }
 
@@ -5162,6 +5220,7 @@ const char str_runOnThread[] PROGMEM = "runOnThread";
 const char str_stopLoop[] PROGMEM = "stopLoop";
 const char str_startloop[] PROGMEM = "startloop";
 const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
+const char str_c_aanalogWrite[] PROGMEM = "c_aanalogWrite";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -6476,6 +6535,7 @@ const tbl_entry_t lookup_table[] PROGMEM = {
   { str_stopLoop, fn_stopLoop, 0x01, runOnThreadDoc },
   { str_startloop, fn_startloop, 0x00, runOnThreadDoc },
   { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
+  { str_c_aanalogWrite, fn_c_aanalogWrite, 0x12, runOnThreadDoc },
 };
 
 // Table lookup functions
