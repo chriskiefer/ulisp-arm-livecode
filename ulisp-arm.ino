@@ -3369,10 +3369,11 @@ object *fn_startloop (object *args, object *env) {
 
 object *fn_runOnThread (object *args, object *env) {
   global_form = first(args);
+
   global_env = env;
 
-  Serial.printf("Printing global env:\n");
-  printobject(env, pstr);
+  Serial.printf("Printing global form:\n");
+  printobject(global_form, pstr);
 
   reset_core_with(eval_global_form);
   return nil;
@@ -7043,9 +7044,6 @@ bool entered_hotloop = false;
 
 object *nextitem (gfun_t gfun) {
   // debug
-  if (entered_hotloop)
-    Serial.printf("netxitem start\n");
-
   int ch = gfun();
   while(issp(ch)) ch = gfun();
 
@@ -7173,9 +7171,6 @@ object *nextitem (gfun_t gfun) {
 }
 
 object *readrest (gfun_t gfun) {
-  if (entered_hotloop)
-    Serial.printf("readrest start\n");
-
   object *item = nextitem(gfun);
   object *head = NULL;
   object *tail = NULL;
@@ -7201,9 +7196,6 @@ object *readrest (gfun_t gfun) {
 }
 
 object *read (gfun_t gfun) {
-  if (entered_hotloop)
-    Serial.printf("read start\n");
-
   object *item = nextitem(gfun);
   if (item == (object *)KET) error2(NIL, PSTR("incomplete list"));
   if (item == (object *)BRA) return readrest(gfun);
@@ -7283,7 +7275,6 @@ void repl (object *env) {
     #endif
 
     if (Serial.available() > 0){
-      Serial.printf("Bytes waiting: %d\n", Serial.available());
       while(Serial.available() > 0) {
         object *line = read(gserial);
         if (BreakLevel && line == nil) { pln(pserial); return; }
@@ -7297,28 +7288,18 @@ void repl (object *env) {
         pop(GCStack);
         pfl(pserial);
         pln(pserial);
-
-        /* gc(NULL, env); */
-
       }
       ulisp_print_prompt();
     } else {
-      object *useq_update = read(update_reader);
-      if (BreakLevel && useq_update == nil) { pln(pserial); return; }
-      if (useq_update == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
-      /* object *useq_update = lispstring((char*)"useq-update"); */
-      /* useq_update->type = SYMBOL; */
-      /* useq_update = cons(useq_update, nil); */
-      /* useq_update = cons(useq_update, nil); */
+      object *update_fn_symbol = lispstring((char*)"useq-update");
+      update_fn_symbol->type = SYMBOL;
 
-      push(useq_update, GCStack);
+      object *update_form = cons(update_fn_symbol, nil);
+      update_form->type = 536884988;
+      push(update_form, GCStack);
       pfl(pserial);
-      useq_update = eval(useq_update, env);
-      pfl(pserial);
-      printobject(useq_update, pserial);
+      update_form = eval(update_form, env);
       pop(GCStack);
-      pfl(pserial);
-      pln(pserial);
     }
   }
 }
@@ -7434,31 +7415,6 @@ void loop () {
   client.stop();
   #endif
 
-  Serial.printf("About to enter REPL.\n");
   ulisp_print_prompt();
   repl(NULL);
-}
-
-int c_str_length(char* str) {
-  int i;
-  for (i = 0; str[i] != '\0'; ++i);
-  return i;
-}
-
-char update_reader_str[] PROGMEM = "((useq-update))";
-
-int entry_string_length = -1;
-int update_reader_pointer = 0;
-
-// Tries to fake the user sending "(useq-update)" to the serial
-int update_reader() {
-  if (entry_string_length < 0)
-    entry_string_length = c_str_length(update_reader_str);
-
-  if (update_reader_pointer >= entry_string_length) {
-    update_reader_pointer = 0;
-    return (int)'\0';
-  } else {
-    return (int)update_reader_str[update_reader_pointer++];
-  }
 }
