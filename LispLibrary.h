@@ -131,6 +131,13 @@ const char LispLibrary[] PROGMEM =
 "(defun in2 (new-form) (setq d4-form new-form))  \n"
 "\n"
 "\n"
+"(defun sig-in (index) (useqGetInput index))\n"
+"(defun swm (index) (useqGetInput (add 2 index)))\n" //momentary switches 0 and 1
+"(defun swt (index) (useqGetInput (add 4 index)))\n" //toggle switches 0 and 1
+"(defun swr () (useqGetInput 6))\n" //rotary enc switch
+"(defun rot () (useqGetInput 7))\n" //rotary encoder value
+"\n"
+"\n"
 "(defun useq-update ()\n"
 "  (set-time (millis))\n"
 "  (update-a1)\n"

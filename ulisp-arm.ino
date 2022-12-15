@@ -354,6 +354,7 @@ STOPLOOP,
 STARTLOOP,
 C_DIGITALWRITE,
 USEQANALOGWRITE,
+USEQGETINPUT,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
@@ -3472,6 +3473,38 @@ object *fn_c_aanalogWrite (object *args, object *env) {
   return nil;
 }
 
+
+//these map onto indexes in lisp input functions
+enum useqInputNames {
+  //signals
+  USEQI1=0,
+  USEQI2=1,
+  //momentary
+  USEQM1=2,
+  USEQM2=3,
+  //toggle
+  USEQT1=4,
+  USEQT2=5,
+  //rotary enoder
+  USEQRS1=6, //switch
+  USEQR1=7 //encoder
+};
+
+int useqInputValues[8];
+
+
+object *fn_c_getUseqInput (object *args, object *env) {
+  object *inputIdxArg = first(args);
+  int value=0;
+  if (integerp(inputIdxArg)) {
+    value = useqInputValues[inputIdxArg->integer];
+  } else {
+   // TODO throw some error
+  }
+  return number(value);
+}
+
+
 // @useq
 // Livecode-specific functions end here
 
@@ -5221,6 +5254,7 @@ const char str_stopLoop[] PROGMEM = "stopLoop";
 const char str_startloop[] PROGMEM = "startloop";
 const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
 const char str_c_aanalogWrite[] PROGMEM = "useqAnalogWrite";
+const char str_c_getInput[] PROGMEM = "useqGetInput";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -6536,6 +6570,9 @@ const tbl_entry_t lookup_table[] PROGMEM = {
   { str_startloop, fn_startloop, 0x00, runOnThreadDoc },
   { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
   { str_c_aanalogWrite, fn_c_aanalogWrite, 0x12, runOnThreadDoc },
+  { str_c_getInput, fn_c_getUseqInput, 0x11, runOnThreadDoc },
+  
+
 };
 
 // Table lookup functions
@@ -7338,8 +7375,10 @@ int gcmd () {
   return (c != 0) ? c : -1; // -1?
 }
 
+
 void repl (object *env) {
   for (;;) {
+        
     randomSeed(micros());
     gc(NULL, env);
     #if defined (printfreespace)
@@ -7356,14 +7395,22 @@ void repl (object *env) {
         pfl(pserial);
         line = eval(line, env);
         pfl(pserial);
-        // printobject(line, pserial);
+        printobject(line, pserial);
         pop(GCStack);
         pfl(pserial);
         pln(pserial);
       }
       ulisp_print_prompt();
     } else {
-      // Serial.println("eval");
+      //read inputs
+      //inputs are input_pullup, so invert
+      useqInputValues[USEQI1] = 1 - digitalRead(USEQ_PIN_I1);
+      useqInputValues[USEQI2] = 1 - digitalRead(USEQ_PIN_I2);
+      digitalWrite(USEQ_PIN_LED_I1, useqInputValues[USEQI1]);
+      digitalWrite(USEQ_PIN_LED_I2, useqInputValues[USEQI2]);
+      useqInputValues[USEQRS1] = 1 - digitalRead(USEQ_PIN_SWITCH_R1);
+
+
       GlobalStringIndex = 0;
       object *line = read(gcmd);
       push(line, GCStack);
