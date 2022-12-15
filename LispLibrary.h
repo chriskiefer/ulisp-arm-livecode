@@ -134,8 +134,11 @@ const char LispLibrary[] PROGMEM =
 "(defun useq-update ()\n"
 "  (set-time (millis))\n"
 "  (update-a1)\n"
+"  (update-a2)\n"
 "  (update-d1)\n"
-"  (print t)\n"
+"  (update-d2)\n"
+"  (update-d3)\n"
+"  (update-d4)\n"
 "  (update-led))\n"
 "\n"
 "(defun every (amt dur) (/ (mod t (* amt dur)) (* amt dur)))\n" ;

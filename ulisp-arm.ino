@@ -7355,9 +7355,8 @@ void repl (object *env) {
         push(line, GCStack);
         pfl(pserial);
         line = eval(line, env);
-        Serial.printf("->type = %d\n", line->type);
         pfl(pserial);
-        printobject(line, pserial);
+        // printobject(line, pserial);
         pop(GCStack);
         pfl(pserial);
         pln(pserial);
@@ -7373,16 +7372,6 @@ void repl (object *env) {
       // printobject(line, pserial);
       pop(GCStack);
 
-      // object *update_fn_symbol = lispstring((char*)"useq-update");
-      // update_fn_symbol->type = SYMBOL;
-
-      // object *update_form = cons(update_fn_symbol, nil);
-      // update_form->type = 536884988;
-      // // update_form->type = 537140992;
-      // push(update_form, GCStack);
-      // pfl(pserial);
-      // update_form = eval(update_form, env);
-      // pop(GCStack);
     }
   }
 }
@@ -7439,10 +7428,32 @@ void setup_leds() {
   digitalWrite(LED_BOARD,1);
 }
 
+
+void setup_switches() {
+  pinMode(USEQ_PIN_SWITCH_M1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_SWITCH_M2, INPUT_PULLUP);  
+
+  pinMode(USEQ_PIN_SWITCH_T1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_SWITCH_T2, INPUT_PULLUP);  
+
+
+}
+
+void setup_rotary_encoder() {
+  pinMode(USEQ_PIN_SWITCH_R1, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_ROTARYENC_A, INPUT_PULLUP);  
+  pinMode(USEQ_PIN_ROTARYENC_B, INPUT_PULLUP);  
+
+}
+
+
+
 void setup_IO() {
  setup_digital_outs();
  setup_analog_outs();
  setup_digital_ins();
+ setup_switches();
+ setup_rotary_encoder(); 
 }
 
 void module_setup() {
