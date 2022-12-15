@@ -353,7 +353,7 @@ RUNONTHREAD,
 STOPLOOP,
 STARTLOOP,
 C_DIGITALWRITE,
-C_AANALOGWRITE,
+USEQANALOGWRITE,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
 
 // Global variables
@@ -3462,9 +3462,9 @@ object *fn_c_aanalogWrite (object *args, object *env) {
   if (integerp(pinArg) && floatp(valArg)) {
     int pin = analog_out_pin(pinArg->integer);
     int led_pin = analog_out_LED_pin(pinArg->integer);
-    int val = floor(valArg->single_float * (float)255);
+    int val = floor(valArg->single_float * (float)2047);
     analogWrite(pin, val);
-    digitalWrite(led_pin, val > 127 ? 1 : 0);
+    analogWrite(led_pin, val);
   } else {
    // TODO throw some error
   }
@@ -5220,7 +5220,7 @@ const char str_runOnThread[] PROGMEM = "runOnThread";
 const char str_stopLoop[] PROGMEM = "stopLoop";
 const char str_startloop[] PROGMEM = "startloop";
 const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
-const char str_c_aanalogWrite[] PROGMEM = "c_aanalogWrite";
+const char str_c_aanalogWrite[] PROGMEM = "useqAnalogWrite";
 
 // Built-in symbol names
 const char string0[] PROGMEM = "nil";
@@ -7326,6 +7326,18 @@ void ulisp_print_prompt() {
 
 int bytes_waiting = 0;
 
+// char cmd1[] = "(+ 10 10)\0";
+char cmd1[] = "(useq-update)";
+int gcmd () {
+  if (LastChar) {
+    char temp = LastChar;
+    LastChar = 0;
+    return temp;
+  }
+  char c = cmd1[GlobalStringIndex++];
+  return (c != 0) ? c : -1; // -1?
+}
+
 void repl (object *env) {
   for (;;) {
     randomSeed(micros());
@@ -7343,6 +7355,7 @@ void repl (object *env) {
         push(line, GCStack);
         pfl(pserial);
         line = eval(line, env);
+        Serial.printf("->type = %d\n", line->type);
         pfl(pserial);
         printobject(line, pserial);
         pop(GCStack);
@@ -7351,15 +7364,25 @@ void repl (object *env) {
       }
       ulisp_print_prompt();
     } else {
-      object *update_fn_symbol = lispstring((char*)"useq-update");
-      update_fn_symbol->type = SYMBOL;
-
-      object *update_form = cons(update_fn_symbol, nil);
-      update_form->type = 536884988;
-      push(update_form, GCStack);
-      pfl(pserial);
-      update_form = eval(update_form, env);
+      // Serial.println("eval");
+      GlobalStringIndex = 0;
+      object *line = read(gcmd);
+      push(line, GCStack);
+      line = eval(line, env);
+      // pfl(pserial);
+      // printobject(line, pserial);
       pop(GCStack);
+
+      // object *update_fn_symbol = lispstring((char*)"useq-update");
+      // update_fn_symbol->type = SYMBOL;
+
+      // object *update_form = cons(update_fn_symbol, nil);
+      // update_form->type = 536884988;
+      // // update_form->type = 537140992;
+      // push(update_form, GCStack);
+      // pfl(pserial);
+      // update_form = eval(update_form, env);
+      // pop(GCStack);
     }
   }
 }
