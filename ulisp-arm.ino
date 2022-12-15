@@ -3306,9 +3306,10 @@ object *tf_help (object *args, object *env) {
 float analog_in_1_latest_value = 0;
 float analog_in_2_latest_value = 0;
 
-// @useq functions
 object *global_env = NULL;
 object *global_form = NULL;
+
+// @useq functions
 
 // TODO perhaps add some FIFO synchronisation if needed?
 void eval_global_form() {
@@ -3410,6 +3411,22 @@ int digital_out_pin(int out) {
   }
 }
 
+int digital_out_LED_pin(int out) {
+  switch (out)  {
+    // Builtin LED
+    case 1:
+      return USEQ_PIN_LED_D1;
+    case 2:
+      return USEQ_PIN_LED_D2;
+    case 3:
+      return USEQ_PIN_LED_D3;
+    case 4:
+      return USEQ_PIN_LED_D4;
+    default:
+      return -1;
+  }
+}
+
 int analog_out_pin(int out) {
   switch (out)  {
     // Analog Pins
@@ -3421,14 +3438,27 @@ int analog_out_pin(int out) {
   }
 }
 
+int analog_out_LED_pin(int out) {
+  switch (out)  {
+    // Analog Pins
+    case 1:
+      return USEQ_PIN_LED_A1;
+    case 2:
+      return USEQ_PIN_LED_A2;
+    default: return -1;
+  }
+}
+
 object *fn_c_digitalWrite (object *args, object *env) {
   (void) env;
   object *pinArg = first(args);
   object *valArg = second(args);
   if (integerp(pinArg) && integerp(valArg)) {
     int pin = digital_out_pin(pinArg->integer);
+    int led_pin = digital_out_LED_pin(pinArg->integer);
     int val = valArg->integer;
     digitalWrite(pin, val);
+    digitalWrite(led_pin, val);
   } else {
    // TODO throw some error
   }
@@ -3442,8 +3472,10 @@ object *fn_c_analogWrite (object *args, object *env) {
   object *valArg = second(args);
   if (integerp(pinArg) && floatp(valArg)) {
     int pin = analog_out_pin(pinArg->integer);
+    int led_pin = analog_out_LED_pin(pinArg->integer);
     int val = int(valArg->single_float * (float)255);
     analogWrite(pin, val);
+    digitalWrite(led_pin, val > 127 ? 1 : 0);
   } else {
    // TODO throw some error
   }
@@ -3462,8 +3494,7 @@ object *fn_c_input2 (object *args, object *env) {
   return makefloat(analog_in_2_latest_value);
 }
 
-// @useq
-// Livecode-specific functions end here
+// @useq-specific functions end here
 
 object *fn_not (object *args, object *env) {
   (void) env;
@@ -7373,9 +7404,10 @@ void repl (object *env) {
         pfl(pserial);
         pln(pserial);
       }
+
       ulisp_print_prompt();
     } else {
-      read_analog_ins();
+      /* read_analog_ins(); */
 
       object *update_fn_symbol = lispstring((char*)"useq-update");
       update_fn_symbol->type = SYMBOL;
@@ -7392,8 +7424,7 @@ void repl (object *env) {
 /* // @useq initialisation */
 /* // A little visual indicator */
 void flash_builtin_led(int num, int amt) {
-  for(int i=0; i < num; i++)
-  {
+  for(int i=0; i < num; i++) {
     digitalWrite(LED_BUILTIN, 1);
     delay(amt);
     digitalWrite(LED_BUILTIN, 0);
@@ -7416,8 +7447,8 @@ void setup_analog_outs() {
   analogWriteFreq(30000); //out of hearing range
   analogWriteResolution(11); // about the best we can get for 30kHz
 
-  analogWrite(USEQ_PIN_A1,0);
-  analogWrite(USEQ_PIN_A2,0);
+  analogWrite(USEQ_PIN_A1, 0);
+  analogWrite(USEQ_PIN_A2, 0);
 }
 
 void setup_digital_ins() {
@@ -7438,7 +7469,7 @@ void setup_leds() {
   pinMode(USEQ_PIN_LED_D3, OUTPUT);
   pinMode(USEQ_PIN_LED_D4, OUTPUT);
 
-  digitalWrite(LED_BOARD,1);
+  digitalWrite(LED_BOARD, 1);
 }
 
 void setup_switches() {
@@ -7447,15 +7478,12 @@ void setup_switches() {
 
   pinMode(USEQ_PIN_SWITCH_T1, INPUT_PULLUP);  
   pinMode(USEQ_PIN_SWITCH_T2, INPUT_PULLUP);  
-
-
 }
 
 void setup_rotary_encoder() {
   pinMode(USEQ_PIN_SWITCH_R1, INPUT_PULLUP);  
   pinMode(USEQ_PIN_ROTARYENC_A, INPUT_PULLUP);  
   pinMode(USEQ_PIN_ROTARYENC_B, INPUT_PULLUP);  
-
 }
 
 void setup_IO() {

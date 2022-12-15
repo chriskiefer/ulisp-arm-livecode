@@ -115,9 +115,6 @@
 
 ;; Outputs
 
-(defvar INPUT_1_VALUE 0)
-(defvar INPUT_2_VALUE 0)
-
 ;; for testing
 (defvar led-form '(sqr beat))
 (defun update-led () (c_digitalWrite 99 (eval led-form)))  ;; runs on core 1
@@ -143,8 +140,7 @@
   (update-a1)
   (update-a2))
 
-;; TODO expand
 (defun useq-update ()
-  (set-time (millis))
+  (update-time)
   (update-outputs)
   (update-led))
