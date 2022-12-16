@@ -7375,6 +7375,37 @@ int gcmd () {
   return (c != 0) ? c : -1; // -1?
 }
 
+static uint8_t prevNextCode = 0;
+static uint16_t store=0;
+
+int8_t read_rotary() {
+  static int8_t rot_enc_table[] = {0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0};
+
+  prevNextCode <<= 2;
+  if (digitalRead(USEQ_PIN_ROTARYENC_B)) prevNextCode |= 0x02;
+  if (digitalRead(USEQ_PIN_ROTARYENC_A)) prevNextCode |= 0x01;
+  prevNextCode &= 0x0f;
+
+   // If valid then store as 16 bit data.
+   if  (rot_enc_table[prevNextCode] ) {
+      store <<= 4;
+      store |= prevNextCode;
+      //if (store==0xd42b) return 1;
+      //if (store==0xe817) return -1;
+      if ((store&0xff)==0x2b) return -1;
+      if ((store&0xff)==0x17) return 1;
+   }
+   return 0;
+}
+
+void readRotaryEnc() {
+  static int32_t c,val;
+
+   if( val=read_rotary() ) {
+      useqInputValues[USEQR1] +=val;
+      // Serial.print(c);Serial.print(" ");
+   }
+}
 
 void repl (object *env) {
   for (;;) {
@@ -7414,6 +7445,7 @@ void repl (object *env) {
       useqInputValues[USEQM2] = 1 - digitalRead(USEQ_PIN_SWITCH_M2);
       useqInputValues[USEQT1] = 1 - digitalRead(USEQ_PIN_SWITCH_T1);
       useqInputValues[USEQT2] = 1 - digitalRead(USEQ_PIN_SWITCH_T2);
+      readRotaryEnc();
 
       GlobalStringIndex = 0;
       object *line = read(gcmd);
@@ -7494,6 +7526,7 @@ void setup_rotary_encoder() {
   pinMode(USEQ_PIN_SWITCH_R1, INPUT_PULLUP);  
   pinMode(USEQ_PIN_ROTARYENC_A, INPUT_PULLUP);  
   pinMode(USEQ_PIN_ROTARYENC_B, INPUT_PULLUP);  
+  useqInputValues[USEQR1] = 0;
 
 }
 
