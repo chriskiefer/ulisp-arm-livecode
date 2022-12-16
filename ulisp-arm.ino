@@ -7319,8 +7319,8 @@ void initenv () {
 }
 
 void led_animation () {
-  int ledDelay=50;
-  for(int i=0; i < 10; i++) {
+  int ledDelay=30;
+  for(int i=0; i < 8; i++) {
     digitalWrite(USEQ_PIN_LED_I1,1);
     delay(ledDelay);
     digitalWrite(USEQ_PIN_LED_A1,1);
@@ -7347,7 +7347,7 @@ void led_animation () {
     delay(ledDelay);
     digitalWrite(USEQ_PIN_LED_I2,0);
     delay(ledDelay);  
-    ledDelay -= 4;
+    ledDelay -= 3;
   }  
 }
 
@@ -7406,7 +7406,7 @@ void readRotaryEnc() {
       // Serial.print(c);Serial.print(" ");
    }
 }
-
+long counter=0;
 void repl (object *env) {
   for (;;) {
         
@@ -7415,9 +7415,11 @@ void repl (object *env) {
     #if defined (printfreespace)
     pint(Freespace, pserial);
     #endif
-
+    // delay(1);
     if (Serial.available() > 0){
       while(Serial.available() > 0) {
+        // auto ts = millis();      
+
         object *line = read(gserial);
         if (BreakLevel && line == nil) { pln(pserial); return; }
         if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
@@ -7430,9 +7432,14 @@ void repl (object *env) {
         pop(GCStack);
         pfl(pserial);
         pln(pserial);
+        // auto elapsed = millis() - ts;
+        // Serial.print("eval q: ");
+        // Serial.println(elapsed);
+
       }
       ulisp_print_prompt();
     } else {
+      // auto ts = millis();      
       //read inputs
       //inputs are input_pullup, so invert
       useqInputValues[USEQI1] = 1 - digitalRead(USEQ_PIN_I1);
@@ -7454,6 +7461,14 @@ void repl (object *env) {
       // pfl(pserial);
       // printobject(line, pserial);
       pop(GCStack);
+
+      // auto elapsed = millis() - ts;
+      // if (counter== 1000) {
+      //   Serial.print("q: ");
+      //   Serial.println(elapsed);
+      //   counter = 0;
+      // }
+      // counter++;
 
     }
   }
@@ -7554,7 +7569,7 @@ void ulisp_setup() {
 void setup () {
   setup_leds();
   flash_builtin_led(4, 150);
-  /* led_animation(); */
+  led_animation();
 
   // Serial setup
   Serial.begin(115200);

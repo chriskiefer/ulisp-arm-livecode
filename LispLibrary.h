@@ -148,4 +148,8 @@ const char LispLibrary[] PROGMEM =
 "  (update-d4)\n"
 "  (update-led))\n"
 "\n"
+"(defun gates (lst speed) (mul (fromList lst (fast speed beat)) (sqr (fast (length lst) beat))))\n"
+"(defun seq (lst speed) (fromList lst (every speed beatDur)))\n"
+"\n"
 "(defun every (amt dur) (/ (mod t (* amt dur)) (* amt dur)))\n" ;
+
