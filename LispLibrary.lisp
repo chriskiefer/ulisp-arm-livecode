@@ -53,10 +53,21 @@
 (defun reset-time ()
   (setq last-reset-time (millis))
   (set-time time))
+
 ;; UI functions
 (defun mod1 (x) (mod x 1.0))
 
-(defun fast (amt phasor) (mod1 (* phasor amt)))
+(defun fast (amt phasor)
+  (mod1 (* phasor amt)))
+
+(defun slow (amt phasor)
+  (let ((result (mod (/ phasor amt) 1)))
+    (if (< result 0)
+        (+ 1 result)
+      result)))
+
+(defun every (amt dur)
+  (/ (mod t (* amt dur)) (* amt dur)))
 
 (defun pulse (on-relative-dur phasor &optional speed-mult)
   (let ((phasor (if speed-mult
@@ -99,8 +110,8 @@
 (defvar INPUT_2_VALUE 0)
 
 ;; for testing
-(defvar led-form '(sqr beat))
-(defun update-led () (c_digitalWrite 99 (eval led-form)))  ;; runs on core 1
+(defvar led-form '(sqr (slow 2 beat)))
+(defun update-led () (useqDigitalWrite 99 (eval led-form)))  ;; runs on core 1
 (defun led (new-form) (setq led-form new-form))  ;; runs on core 0
 
 ;; Digital outs
@@ -108,26 +119,52 @@
 (defvar d2-form '(sqr (fast 2 beat)))
 (defvar d3-form '(sqr (fast 3 beat)))
 (defvar d4-form '(sqr (fast 4 beat)))
-(defun update-d1 () (c_digitalWrite 1 (eval d1-form)))  ;; runs on core 1
-(defun update-d2 () (c_digitalWrite 2 (eval d2-form)))  ;; runs on core 1
-(defun update-d3 () (c_digitalWrite 3 (eval d3-form)))  ;; runs on core 1
-(defun update-d4 () (c_digitalWrite 4 (eval d4-form)))  ;; runs on core 1
+(defun update-d1 () (useqDigitalWrite 1 (eval d1-form)))  ;; runs on core 1
+(defun update-d2 () (useqDigitalWrite 2 (eval d2-form)))  ;; runs on core 1
+(defun update-d3 () (useqDigitalWrite 3 (eval d3-form)))  ;; runs on core 1
+(defun update-d4 () (useqDigitalWrite 4 (eval d4-form)))  ;; runs on core 1
 (defun d1 (new-form) (setq d1-form new-form))  ;; runs on core 0
 (defun d2 (new-form) (setq d2-form new-form))  ;; runs on core 0
 (defun d3 (new-form) (setq d3-form new-form))  ;; runs on core 0
 (defun d4 (new-form) (setq d4-form new-form))  ;; runs on core 0
 
 ;; Analog outs
-(defun update-a1 () (c_analogWrite 1 (eval a1-form)))  ;; runs on core 1
-(defun update-a2 () (c_analogWrite 2 (eval a2-form)))  ;; runs on core 1
+(defvar a1-form '(every 2 beatDur))
+(defvar a2-form '(every 4 beatDur))
+(defun update-a1 () (useqAnalogWrite 1 (eval a1-form)))
+(defun update-a2 () (useqAnalogWrite 2 (eval a2-form)))
+(defun a1 (new-form) (setq a1-form new-form))
+(defun a2 (new-form) (setq a2-form new-form))
 
 ;; TODO some kind of thread synchronisation needed here?
-(defun in1 (new-form) INPUT_1_VALUE)
-(defun in2 (new-form) (setq d4-form new-form))  ;; runs on core 0
 
-;; TODO
 (defun useq-update ()
   (set-time (millis))
+  (update-a1)
+  (update-a2)
+  (update-d1)
+  (update-d2)
+  (update-d3)
+  (update-d4)
   (update-led))
 
-(defun every (amt dur) (/ (mod t (* amt dur)) (* amt dur)))
+(defun gates (lst speed)
+  (mul (fromList lst (fast speed beat))
+       (sqr (fast (length lst) beat))))
+
+(defun seq (lst speed)
+  (fromList lst (every speed beatDur)))
+
+(defun sig-in (index) (useqGetInput index))
+;; Convenience shortcuts
+(defun in1 () (useqGetInput 1))
+(defun in2 () (useqGetInput 2))
+
+;; momentary switches 0 and 1
+(defun swm (index) (useqGetInput (add 2 index)))
+;; toggle switches 0 and 1
+(defun swt (index) (useqGetInput (add 4 index)))
+;; rotary enc switch
+(defun swr () (useqGetInput 6))
+;; rotary encoder value
+(defun rot () (useqGetInput 7)
