@@ -352,7 +352,7 @@ USERFUNCTIONS,
 RUNONTHREAD,
 STOPLOOP,
 STARTLOOP,
-C_DIGITALWRITE,
+USEQDIGITALWRITE,
 USEQANALOGWRITE,
 USEQGETINPUT,
 ENDFUNCTIONS, SET_SIZE = INT_MAX };
@@ -3441,7 +3441,7 @@ int analog_out_LED_pin(int out) {
   }
 }
 
-object *fn_c_digitalWrite (object *args, object *env) {
+object *fn_useqDigitalWrite (object *args, object *env) {
   object *pinArg = first(args);
   object *valArg = second(args);
   if (integerp(pinArg) && integerp(valArg)) {
@@ -3456,7 +3456,7 @@ object *fn_c_digitalWrite (object *args, object *env) {
   return nil;
 }
 
-object *fn_c_aanalogWrite (object *args, object *env) {
+object *fn_useqAnalogWrite (object *args, object *env) {
   (void) env;
   object *pinArg = first(args);
   object *valArg = second(args);
@@ -5252,8 +5252,8 @@ object *fn_invertdisplay (object *args, object *env) {
 const char str_runOnThread[] PROGMEM = "runOnThread";
 const char str_stopLoop[] PROGMEM = "stopLoop";
 const char str_startloop[] PROGMEM = "startloop";
-const char str_c_digitalWrite[] PROGMEM = "c_digitalWrite";
-const char str_c_aanalogWrite[] PROGMEM = "useqAnalogWrite";
+const char str_useqDigitalWrite[] PROGMEM = "useqDigitalWrite";
+const char str_useqAnalogWrite[] PROGMEM = "useqAnalogWrite";
 const char str_c_getInput[] PROGMEM = "useqGetInput";
 
 // Built-in symbol names
@@ -6568,8 +6568,8 @@ const tbl_entry_t lookup_table[] PROGMEM = {
   { str_runOnThread, fn_runOnThread, 0x11, runOnThreadDoc },
   { str_stopLoop, fn_stopLoop, 0x01, runOnThreadDoc },
   { str_startloop, fn_startloop, 0x00, runOnThreadDoc },
-  { str_c_digitalWrite, fn_c_digitalWrite, 0x12, runOnThreadDoc },
-  { str_c_aanalogWrite, fn_c_aanalogWrite, 0x12, runOnThreadDoc },
+  { str_useqDigitalWrite, fn_useqDigitalWrite, 0x12, runOnThreadDoc },
+  { str_useqAnalogWrite, fn_useqAnalogWrite, 0x12, runOnThreadDoc },
   { str_c_getInput, fn_c_getUseqInput, 0x11, runOnThreadDoc },
   
 

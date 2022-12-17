@@ -111,7 +111,7 @@ const char LispLibrary[] PROGMEM =
 "(defvar INPUT_2_VALUE 0)\n"
 "\n"
 "\n"
-"(defvar led-form '(sqr (slow 2 beat)))\n"
+"(defvar led-form '(sqr (fast 2 beat)))\n"
 "(defun update-led () (useqDigitalWrite 99 (eval led-form)))  \n"
 "(defun led (new-form) (setq led-form new-form))  \n"
 "\n"

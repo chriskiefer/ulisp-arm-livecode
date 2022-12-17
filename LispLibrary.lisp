@@ -110,7 +110,7 @@
 (defvar INPUT_2_VALUE 0)
 
 ;; for testing
-(defvar led-form '(sqr (slow 2 beat)))
+(defvar led-form '(sqr (fast 2 beat)))
 (defun update-led () (useqDigitalWrite 99 (eval led-form)))  ;; runs on core 1
 (defun led (new-form) (setq led-form new-form))  ;; runs on core 0
 
