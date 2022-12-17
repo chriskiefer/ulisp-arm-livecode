@@ -7406,21 +7406,41 @@ void readRotaryEnc() {
       // Serial.print(c);Serial.print(" ");
    }
 }
-long counter=0;
+
+void readInputs() {
+  //inputs are input_pullup, so invert
+  useqInputValues[USEQI1] = 1 - digitalRead(USEQ_PIN_I1);
+  useqInputValues[USEQI2] = 1 - digitalRead(USEQ_PIN_I2);
+  digitalWrite(USEQ_PIN_LED_I1, useqInputValues[USEQI1]);
+  digitalWrite(USEQ_PIN_LED_I2, useqInputValues[USEQI2]);
+  useqInputValues[USEQRS1] = 1 - digitalRead(USEQ_PIN_SWITCH_R1);
+
+  useqInputValues[USEQM1] = 1 - digitalRead(USEQ_PIN_SWITCH_M1);
+  useqInputValues[USEQM2] = 1 - digitalRead(USEQ_PIN_SWITCH_M2);
+  useqInputValues[USEQT1] = 1 - digitalRead(USEQ_PIN_SWITCH_T1);
+  useqInputValues[USEQT2] = 1 - digitalRead(USEQ_PIN_SWITCH_T2);
+}
+
+long counter = 0;
+
 void repl (object *env) {
   for (;;) {
-        
     randomSeed(micros());
     gc(NULL, env);
     #if defined (printfreespace)
     pint(Freespace, pserial);
     #endif
-    // delay(1);
+
+    // Check if there's serial data waiting to be eval'ed
     if (Serial.available() > 0){
+    // Consume all the data until there's nothing left
+    // We need this because `read(gserial)` will return when it reads one full
+    // Lisp statement, but there may be multiple waiting to be executed
       while(Serial.available() > 0) {
         // auto ts = millis();      
 
         object *line = read(gserial);
+
         if (BreakLevel && line == nil) { pln(pserial); return; }
         if (line == (object *)KET) error2(NIL, PSTR("unmatched right bracket"));
 
@@ -7435,31 +7455,17 @@ void repl (object *env) {
         // auto elapsed = millis() - ts;
         // Serial.print("eval q: ");
         // Serial.println(elapsed);
-
       }
       ulisp_print_prompt();
     } else {
       // auto ts = millis();      
-      //read inputs
-      //inputs are input_pullup, so invert
-      useqInputValues[USEQI1] = 1 - digitalRead(USEQ_PIN_I1);
-      useqInputValues[USEQI2] = 1 - digitalRead(USEQ_PIN_I2);
-      digitalWrite(USEQ_PIN_LED_I1, useqInputValues[USEQI1]);
-      digitalWrite(USEQ_PIN_LED_I2, useqInputValues[USEQI2]);
-      useqInputValues[USEQRS1] = 1 - digitalRead(USEQ_PIN_SWITCH_R1);
-
-      useqInputValues[USEQM1] = 1 - digitalRead(USEQ_PIN_SWITCH_M1);
-      useqInputValues[USEQM2] = 1 - digitalRead(USEQ_PIN_SWITCH_M2);
-      useqInputValues[USEQT1] = 1 - digitalRead(USEQ_PIN_SWITCH_T1);
-      useqInputValues[USEQT2] = 1 - digitalRead(USEQ_PIN_SWITCH_T2);
+      readInputs();
       readRotaryEnc();
 
       GlobalStringIndex = 0;
       object *line = read(gcmd);
       push(line, GCStack);
       line = eval(line, env);
-      // pfl(pserial);
-      // printobject(line, pserial);
       pop(GCStack);
 
       // auto elapsed = millis() - ts;
@@ -7488,9 +7494,9 @@ void flash_builtin_led(int num, int amt) {
 
 void setup_digital_outs() {
   pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
-  pinMode(USEQ_PIN_D1, OUTPUT); 
+  pinMode(USEQ_PIN_D2, OUTPUT);
+  pinMode(USEQ_PIN_D3, OUTPUT);
+  pinMode(USEQ_PIN_D4, OUTPUT);
 }
 
 void setup_analog_outs() {
@@ -7511,7 +7517,7 @@ void setup_digital_ins() {
 }
 
 void setup_leds() {
-  pinMode(LED_BOARD,OUTPUT);  //test LED
+  pinMode(LED_BOARD, OUTPUT);  //test LED
 
   pinMode(USEQ_PIN_LED_I1, OUTPUT);
   pinMode(USEQ_PIN_LED_I2, OUTPUT);
@@ -7523,9 +7529,8 @@ void setup_leds() {
   pinMode(USEQ_PIN_LED_D3, OUTPUT);
   pinMode(USEQ_PIN_LED_D4, OUTPUT);
 
-  digitalWrite(LED_BOARD,1);
+  digitalWrite(LED_BOARD, 1);
 }
-
 
 void setup_switches() {
   pinMode(USEQ_PIN_SWITCH_M1, INPUT_PULLUP);  
@@ -7533,8 +7538,6 @@ void setup_switches() {
 
   pinMode(USEQ_PIN_SWITCH_T1, INPUT_PULLUP);  
   pinMode(USEQ_PIN_SWITCH_T2, INPUT_PULLUP);  
-
-
 }
 
 void setup_rotary_encoder() {
@@ -7542,10 +7545,7 @@ void setup_rotary_encoder() {
   pinMode(USEQ_PIN_ROTARYENC_A, INPUT_PULLUP);  
   pinMode(USEQ_PIN_ROTARYENC_B, INPUT_PULLUP);  
   useqInputValues[USEQR1] = 0;
-
 }
-
-
 
 void setup_IO() {
  setup_digital_outs();
